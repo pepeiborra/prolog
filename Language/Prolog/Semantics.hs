@@ -23,7 +23,7 @@ deriving instance Ord VName
 
 eval :: Program -> Pred -> Maybe Environment
 eval pgm = fmap snd . runEnvM . run pgm
-debug :: Program -> Pred -> Maybe [ [Clause]]
+debug :: Program -> Pred -> Maybe [ [Pred] ]
 debug pgm = (`evalStateT` mempty) . execWriterT . unEnvM . run pgm
 
 --run :: (MonadWriter [[Pred]] m, MonadEnv m, MonadFresh m) => Program -> Pred -> m ()
