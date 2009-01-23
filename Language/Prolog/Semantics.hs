@@ -13,6 +13,7 @@ import Data.Foldable (foldMap, toList)
 import Data.Monoid
 import Data.Traversable
 import Data.Map (Map)
+import Text.PrettyPrint
 
 import Prelude hiding (mapM)
 
@@ -20,6 +21,8 @@ import Language.Prolog.Syntax
 
 type Environment = Map VName Term
 deriving instance Ord VName
+instance Ppr Environment where
+    ppr = fcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList
 
 eval :: Program -> Pred -> Maybe Environment
 eval pgm = fmap snd . runEnvM . run pgm
