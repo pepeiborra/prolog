@@ -6,7 +6,7 @@ module Language.Prolog.Semantics (eval, debug, unify, Environment) where
 import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), ap)
-import Control.Monad.State  (StateT(..), MonadState(..), execStateT, evalStateT, modify, lift)
+import Control.Monad.State  (StateT(..), MonadState(..), execStateT, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
 import qualified Data.Map as Map
 import Data.Foldable (foldMap, toList)
@@ -20,25 +20,27 @@ import Language.Prolog.Syntax
 
 type Environment = Map VName Term
 deriving instance Ord VName
+type Goal = [Pred]
 
-eval :: Program -> Pred -> Maybe Environment
+eval  :: Program -> Pred -> [Environment]
 eval pgm = fmap snd . runEnvM . run pgm
-debug :: Program -> Pred -> Maybe [ [Pred] ]
+debug :: Program -> Pred -> [ [Goal] ]
 debug pgm = (`evalStateT` mempty) . execWriterT . unEnvM . run pgm
 
---run :: (MonadWriter [[Pred]] m, MonadEnv m, MonadFresh m) => Program -> Pred -> m ()
+--run :: (MonadWriter [Goal] m, MonadTrans m, MonadEnv m, MonadFresh m) => Program -> Pred -> m ()
+run :: Program -> Pred -> EnvM ()
 run pgm p = go [p] where
   go [] = return ()
   go prob@(p:rest) = do
         (mapM.mapM) zonk prob >>= \prob' -> tell [prob']
-        (h :- goal) <- msum (forEach pgm $ \c-> do{ c'@(h:-_) <- fresh c; unify h p; return c'})
-        go (goal ++ rest)
-
+        h :- t <- liftList pgm >>= fresh
+        unify h p
+        go (t  ++ rest)
 
 class Unify t where unify :: MonadEnv m => t -> t -> m ()
 instance Unify Pred where
   unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
-  unify (Pred ft t) (Pred fs s) = do {e <- getEnv; zipWithM_ unify t s `mplus` (putEnv e >> fail "Can't unify")}
+  unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
 
 instance Unify Term where
   unify t s = do
@@ -66,14 +68,17 @@ zonk x = do
             return (term f tt')
     _ -> return x'
 
-newtype EnvM a = EnvM {unEnvM::WriterT [[Pred]] (StateT (Int, Environment) Maybe) a}
-    deriving (Functor, Monad, MonadPlus, MonadState (Int, Environment), MonadWriter [[Pred]])
+newtype EnvM a = EnvM {unEnvM::WriterT [Goal] (StateT (Int, Environment) []) a}
+    deriving (Functor, Monad, MonadPlus, MonadState (Int, Environment), MonadWriter [Goal])
 type SavePoint = Environment
 
 instance Applicative EnvM where (<*>) = ap; pure = return
 instance Monoid Int where mempty = 0; mappend = (+)
 
 runEnvM = (`execStateT` mempty) . runWriterT . unEnvM
+
+liftList :: [a] -> EnvM a
+liftList = EnvM . lift . lift
 
 instance MonadEnv EnvM where
   getEnv = snd `liftM` get
