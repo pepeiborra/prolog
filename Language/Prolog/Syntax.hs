@@ -1,5 +1,6 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module Language.Prolog.Syntax where
 
 import Control.Applicative
@@ -21,7 +22,16 @@ instance Foldable    PredF where foldMap  f (Pred a tt) = foldMap f tt
 instance Traversable PredF where traverse f (Pred a tt) = Pred a <$> traverse f tt
 
 data TermF f = Term Atom [f] | Var VName deriving (Eq, Show)
-instance Functor TermF where fmap f (Term a tt) = Term a (fmap f tt)
+instance Functor TermF     where
+    fmap     f (Term a tt) = Term a (fmap f tt)
+    fmap     f (Var i)     = Var i
+instance Foldable    TermF where
+    foldMap  f (Term a tt) = foldMap f tt
+    foldMap  f (Var i)     = mempty
+instance Traversable TermF where
+    traverse f (Term a tt) = Term a <$> traverse f tt
+    traverse f (Var i)     = pure (Var i)
+
 
 data In f = In {out::f (In f)}
 deriving instance Eq (f(In f)) => Eq (In f)
@@ -41,6 +51,15 @@ var  = In . Var . VName
 
 var' :: Int -> Term
 var' = In . Var . Auto
+
+subterms :: Term -> [Term]
+subterms (In t) = In t : Prelude.concat (subterms <$> toList t)
+
+vars :: Term -> [VName]
+vars t = [ v | (out -> Var v) <- subterms t] where
+    isVar (out -> Var{}) = True
+    isVar _              = False
+
 
 class Ppr a where ppr :: a -> Doc
 instance Ppr a => Ppr (TermF a) where

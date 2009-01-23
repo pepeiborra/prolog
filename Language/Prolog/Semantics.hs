@@ -1,7 +1,7 @@
 {-# LANGUAGE NoMonomorphismRestriction, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts, TypeSynonymInstances #-}
-module Language.Prolog.Semantics (eval, debug, unify, Environment) where
+module Language.Prolog.Semantics (eval, debug, unify, zonk, Environment) where
 
 import Control.Applicative
 import Control.Arrow (first, second)
@@ -9,6 +9,7 @@ import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), ap)
 import Control.Monad.State  (StateT(..), MonadState(..), execStateT, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Foldable (foldMap, toList)
 import Data.Monoid
 import Data.Traversable
@@ -26,9 +27,13 @@ deriving instance Ord VName
 instance Ppr Environment where
     ppr = fcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList
 
+restrictTo :: [VName] -> Environment -> Environment
+restrictTo vv e = Map.intersectionWith const e (Map.fromDistinctAscList (zip vv (repeat undefined)))
 
 eval  :: Program -> Pred -> [Environment]
-eval pgm = fmap snd . runEnvM . run pgm
+eval pgm q = (fmap (restrictTo (snub $ foldMap vars q) .  zonkEnv . snd) . execEnvM . run pgm) q
+    where zonkEnv env = head $ evalEnvM env (mapM zonk env)
+
 debug :: Program -> Pred -> [ [Goal] ]
 debug pgm = (`evalStateT` mempty) . execWriterT . unEnvM . run pgm
 
@@ -37,7 +42,7 @@ run :: Program -> Pred -> EnvM ()
 run pgm p = go [p] where
   go [] = return ()
   go prob@(p:rest) = do
-        (mapM.mapM) zonk prob >>= \prob' -> tell [prob']
+        mapM2 zonk prob >>= \prob' -> tell [prob']
         h :- t <- liftList pgm >>= fresh
         unify h p
         go (t  ++ rest)
@@ -80,7 +85,8 @@ type SavePoint = Environment
 instance Applicative EnvM where (<*>) = ap; pure = return
 instance Monoid Int where mempty = 0; mappend = (+)
 
-runEnvM = (`execStateT` mempty) . runWriterT . unEnvM
+execEnvM = (`execStateT` mempty) . runWriterT . unEnvM
+evalEnvM env = fmap fst . (`evalStateT` (mempty,env)) . runWriterT . unEnvM
 
 liftList :: [a] -> EnvM a
 liftList = EnvM . lift . lift
@@ -118,4 +124,8 @@ fresh =  (`evalStateT` mempty) . freshF
 --subTerms :: Term -> [Term]
 --subTerms = foldMap toList
 
+fmap3   = fmap.fmap.fmap
+mapM3   = mapM.mapM2
+mapM2   = mapM.mapM
 forEach = flip map
+snub    = Set.toList . Set.fromList
