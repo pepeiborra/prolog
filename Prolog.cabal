@@ -12,7 +12,8 @@ author: Pepe Iborra
 
 Library
   buildable: True
-  build-depends: base, parsec
+  build-depends: base, parsec, pretty, containers, mtl
   exposed-modules:
      Language.Prolog.Parser
      Language.Prolog.Syntax
+     Language.Prolog.Semantics
