@@ -14,9 +14,9 @@ program   = whiteSpace *> many1 clause <* eof
 clause    = (:-) <$> predicate <*> (reservedOp ":-" *> commaSep1 predicate <|> return [])
                                 <* optional dot
 predicate = Pred <$> atom <*> (parens (commaSep1 term) <|> return [])
-term      = var <|> try list1 <|> list2 <|> simple
+term      = var <|> simple <|> try list1 <|> list2
 simple    = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
-var       = do
+var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
   return (S.var (first : rest))
