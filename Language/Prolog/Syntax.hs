@@ -16,10 +16,16 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-data PredF f   = Pred Atom [f]  deriving (Eq, Show)
-instance Functor     PredF where fmap     f (Pred a tt) = Pred a (fmap f tt)
-instance Foldable    PredF where foldMap  f (Pred a tt) = foldMap f tt
-instance Traversable PredF where traverse f (Pred a tt) = Pred a <$> traverse f tt
+data PredF f   = Pred Atom [f] | Cut  deriving (Eq, Show)
+instance Functor     PredF where
+    fmap     f (Pred a tt) = Pred a (fmap f tt)
+    fmap     f Cut         = Cut
+instance Foldable    PredF where
+    foldMap  f (Pred a tt) = foldMap f tt
+    foldMap  f Cut         = mempty
+instance Traversable PredF where
+    traverse f (Pred a tt) = Pred a <$> traverse f tt
+    traverse f Cut         = pure Cut
 
 data TermF f = Term Atom [f] | Var VName deriving (Eq, Show)
 instance Functor TermF     where

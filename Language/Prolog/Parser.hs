@@ -10,17 +10,26 @@ import Text.ParserCombinators.Parsec.Language
 import qualified Language.Prolog.Syntax as S
 import Language.Prolog.Syntax hiding (term, var)
 
-program   = whiteSpace *> many1 clause <* eof
+type Comment = String
+program  :: CharParser () [Either Comment Clause]
+program   = whiteSpace *> many1 (Left <$> line_comment <|> Right <$> clause) <* eof
+
+line_comment = lexeme(char '%' *> many (noneOf "\n"))
+
 clause    = (:-) <$> predicate <*> (reservedOp ":-" *> commaSep1 predicate <|> return [])
                                 <* optional dot
-predicate = Pred <$> atom <*> (parens (commaSep1 term) <|> return [])
-term      = var <|> simple <|> try list1 <|> list2
+predicate = reservedOp "!" >> return Cut <|>
+            Pred <$> atom <*> (parens (commaSep1 term) <|> return [])
+term      = var <|>
+            simple <|>
+            try list1 <|>
+            list2
 simple    = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
 var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
   return (S.var (first : rest))
-atom      = identifier
+atom      = identifier <|> (show <$> natural)
 
 list1 = brackets $ do
   terms <- commaSep1 term
@@ -56,7 +65,7 @@ prologStyle :: LanguageDef st
 prologStyle= emptyDef
                 { commentStart   = "/*"
                 , commentEnd     = "*/"
-                , commentLine    = "%"
+                , commentLine    = ""
                 , nestedComments = True
                 , identStart     = letter
                 , identLetter	 = alphaNum <|> oneOf "_'"
@@ -68,7 +77,7 @@ prologStyle= emptyDef
                 }
 
 prologDef = prologStyle
-            { reservedOpNames = [":-","|"]
+            { reservedOpNames = [":-","|","!"]
             }
 
 -- Applicative instances for Parsec

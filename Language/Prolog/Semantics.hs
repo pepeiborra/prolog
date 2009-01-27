@@ -39,13 +39,14 @@ debug pgm = (`evalStateT` mempty) . execWriterT . unEnvM . run pgm
 
 --run :: (MonadWriter [Goal] m, MonadTrans m, MonadEnv m, MonadFresh m) => Program -> Pred -> m ()
 run :: Program -> Pred -> EnvM ()
-run pgm p = go [p] where
-  go [] = return ()
-  go prob@(p:rest) = do
+run pgm p = go [p] pgm where
+  go [] cc         = return ()
+  go (Cut:rest) cc = go rest cc
+  go prob@(p:rest) cc = do
         mapM2 zonk prob >>= \prob' -> tell [prob']
-        h :- t <- liftList pgm >>= fresh
+        h :- t <- liftList cc >>= fresh -- TODO: modify for cut
         unify h p
-        go (t  ++ rest)
+        go (t  ++ rest) cc
 
 class Unify t where unify :: MonadEnv m => t -> t -> m ()
 instance Unify Pred where
