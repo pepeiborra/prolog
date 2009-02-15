@@ -1,0 +1,19 @@
+name: prolog
+version: 0.1
+Cabal-Version:  >= 1.2
+license: AllRightsReserved
+license-file: ""
+copyright: Pepe Iborra, All Rights Reserved
+homepage:
+synopsis: Prolog syntax and Parsec based parser
+description: 
+category:
+author: Pepe Iborra
+
+Library
+  buildable: True
+  build-depends: base, parsec, pretty, containers, mtl
+  exposed-modules:
+     Language.Prolog.Parser
+     Language.Prolog.Syntax
+     Language.Prolog.Semantics
