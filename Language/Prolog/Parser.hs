@@ -38,25 +38,35 @@ term_basic = (var <|>
               list2)
              <?> "term"
 
-simple    = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
+simple = aterm <|> atuple where
+    aterm  = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
+    atuple = S.term "" <$> parens(commaSep1 term)
+
 var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
   return (S.var (first : rest))
 
-atom      = identifier <|> atomLiteral
+atom      = (identifier  <|>
+             atomLiteral <|>
+             operator    <|>
+--           string "[]" >> return nil <|>
+             string "{}" <|>
+--           string "!"  >> return cut <|>
+             string ";"
+            ) <?> "atom"
 
 list1 = brackets $ do
   terms <- commaSep1 term
   reservedOp "|"
   tail <- term
-  return $ S.term ":" [foldr1 cons terms, tail]
+  return $ S.term "." [foldr1 cons terms, tail]
 
 list2 = brackets $ do
   terms <- commaSep term
   return $ foldr cons nil terms
 
-cons x y =  S.term ":" [x,y]
+cons x y =  S.term "." [x,y]
 nil      = (S.term "[]" [])
 
 -- Expressions
@@ -71,12 +81,7 @@ table   = [[op "*" AssocLeft, op "/" AssocLeft]
           op s assoc
              = Infix (do{ symbol s; return (\x y -> S.term s [x,y])}) assoc
 
-factor  = (do{ char '('
-            ; x <- term
-            ; char ')'
-            ; return x
-            }
-          <|> term_basic)
+factor  = (try(parens term) <|> term_basic)
         <?> "simple expression"
 
 -- Lexer
@@ -98,7 +103,7 @@ commaSep1 = P.commaSep1 lexer
 integer   = P.integer lexer
 float     = P.float lexer
 stringLiteral = P.stringLiteral lexer
-
+operator  = P.operator lexer
 
 lexer :: P.TokenParser ()
 lexer  = P.makeTokenParser prologDef
@@ -111,8 +116,8 @@ prologStyle= emptyDef
                 , nestedComments = True
                 , identStart     = do {c <- letter; guard (isLower c); return c}
                 , identLetter	 = alphaNum <|> oneOf "_'"
---                , opStart	 = opLetter prologStyle
---                , opLetter	 = oneOf ":!#$%&*+./<=>?@\\^|-~"
+                , opStart	 = opLetter prologStyle
+                , opLetter	 = oneOf "+-*/\\^<>=`~:.?@#$&"
                 , reservedOpNames= []
                 , reservedNames  = []
                 , caseSensitive  = True
