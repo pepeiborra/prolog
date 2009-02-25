@@ -11,7 +11,7 @@ import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
 
 import qualified Language.Prolog.Syntax as S
-import Language.Prolog.Syntax hiding (term, var, atom, int, float)
+import Language.Prolog.Syntax hiding (term, var, ident, int, float)
 
 type Comment = String
 
@@ -23,23 +23,23 @@ infixr 0 <|>
 program  :: CharParser () [Clause]
 program   = whiteSpace *> many1 clause <* eof
 
-clause    = (:-) <$> predicate <*> (reservedOp ":-" *> commaSep1 predicate <|> return [])
+clause    = (:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return [])
                                 <* optional dot
-predicate = (reservedOp "!" >> return Cut <|>
-            Pred <$> atom <*> (parens (commaSep1 term) <|> return [])) <?> "predicate"
+atom = (reservedOp "!" >> return Cut <|>
+       Pred <$> ident <*> (parens (commaSep1 term) <|> return [])) <?> "predicate"
 
 term_basic = (var <|>
               simple <|>
               lexeme (char '_') >> return wildcard <|>
               S.int <$> integer <|>
               S.float <$> float <|>
-              (foldr cons nil . map (S.atom . (:[]))) <$> stringLiteral <|>
+              (foldr cons nil . map (S.ident . (:[]))) <$> stringLiteral <|>
               try list1 <|>
               list2)
              <?> "term"
 
 simple = aterm <|> atuple where
-    aterm  = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
+    aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
     atuple = S.term "" <$> parens(commaSep1 term)
 
 var       = lexeme$ do
@@ -47,14 +47,14 @@ var       = lexeme$ do
   rest  <- many (alphaNum <|> char '_')
   return (S.var (first : rest))
 
-atom      = (identifier  <|>
-             atomLiteral <|>
+ident      = (identifier  <|>
+             identLiteral <|>
              operator    <|>
 --           string "[]" >> return nil <|>
              string "{}" <|>
 --           string "!"  >> return cut <|>
              string ";"
-            ) <?> "atom"
+            ) <?> "ident"
 
 list1 = brackets $ do
   terms <- commaSep1 term
@@ -127,10 +127,10 @@ prologDef = prologStyle
             { reservedOpNames = [":-","|","!"]
             }
 
-atomLiteral = lexeme (between (char '\'')
-                                  (char '\'' <?> "end of atom")
+identLiteral = lexeme (between (char '\'')
+                                  (char '\'' <?> "end of identifier")
                                   (many (identLetter prologStyle))
-                     ) <?> "quoted atom"
+                     ) <?> "quoted identifier"
 
 -- Applicative instances for Parsec
 -- ---------------------------------

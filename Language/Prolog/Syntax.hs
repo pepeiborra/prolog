@@ -12,23 +12,23 @@ import Text.PrettyPrint as Ppr
 
 type Program = [Clause]
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data PredF f   = Pred Atom [f] | Cut  deriving (Eq, Show)
-data TermF f = Term Atom [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
+data AtomF f   = Pred Ident [f] | Cut  deriving (Eq, Show)
+data TermF f = Term Ident [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
 data In f = In {out::f (In f)}
 
-type Clause = ClauseF Pred
-type Pred   = PredF Term
+type Clause = ClauseF Atom
+type Atom   = AtomF Term
 type Term   = In TermF
 data VName  = VName String | Auto Int deriving (Eq, Show)
-type Atom   = String
+type Ident   = String
 
-atom :: Atom -> Term
-atom f = term f []
+ident :: Ident -> Term
+ident f = term f []
 
-term :: Atom -> [Term] -> Term
+term :: Ident -> [Term] -> Term
 term f = In . Term f
 
-var :: Atom -> Term
+var :: Ident -> Term
 var  = In . Var . VName
 
 var' :: Int -> Term
@@ -63,7 +63,7 @@ instance Ppr VName where
     ppr (VName v)  = text v
     ppr (Auto v_i) = text "V" <> Ppr.int v_i
 
-instance Ppr Pred where
+instance Ppr Atom where
     ppr (Pred f []) = text f
     ppr (Pred f tt) = text f <> parens(fcat (punctuate comma $ map ppr tt))
 
@@ -75,7 +75,7 @@ instance Ppr Program where ppr = vcat . map ppr
 {-
 instance Show Program where show = render . ppr
 instance Show Clause  where show = render . ppr
-instance Show Pred    where show = render . ppr
+instance Show Atom    where show = render . ppr
 instance Show Term    where show = render . ppr
 instance Show VName   where show = render . ppr
 -}
@@ -87,13 +87,13 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-instance Functor     PredF where
+instance Functor     AtomF where
     fmap     f (Pred a tt) = Pred a (fmap f tt)
     fmap     f Cut         = Cut
-instance Foldable    PredF where
+instance Foldable    AtomF where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
-instance Traversable PredF where
+instance Traversable AtomF where
     traverse f (Pred a tt) = Pred a <$> traverse f tt
     traverse f Cut         = pure Cut
 

@@ -20,7 +20,7 @@ import Prelude hiding (mapM)
 
 import Language.Prolog.Syntax
 
-type Goal = [Pred]
+type Goal = [Atom]
 type Environment = Map VName Term
 deriving instance Ord VName
 
@@ -30,15 +30,15 @@ instance Ppr Environment where
 restrictTo :: [VName] -> Environment -> Environment
 restrictTo vv e = Map.intersectionWith const e (Map.fromDistinctAscList (zip vv (repeat undefined)))
 
-eval  :: Program -> Pred -> [Environment]
+eval  :: Program -> Atom -> [Environment]
 eval pgm q = (fmap (restrictTo (snub $ foldMap vars q) .  zonkEnv . snd) . execEnvM . run pgm) q
     where zonkEnv env = head $ evalEnvM env (mapM zonk env)
 
-debug :: Program -> Pred -> [ [Goal] ]
+debug :: Program -> Atom -> [ [Goal] ]
 debug pgm = (`evalStateT` mempty) . execWriterT . unEnvM . run pgm
 
---run :: (MonadWriter [Goal] m, MonadTrans m, MonadEnv m, MonadFresh m) => Program -> Pred -> m ()
-run :: Program -> Pred -> EnvM ()
+--run :: (MonadWriter [Goal] m, MonadTrans m, MonadEnv m, MonadFresh m) => Program -> Atom -> m ()
+run :: Program -> Atom -> EnvM ()
 run pgm p = go [p] pgm where
   go [] cc         = return ()
   go (Cut:rest) cc = go rest cc
@@ -49,7 +49,7 @@ run pgm p = go [p] pgm where
         go (t  ++ rest) cc
 
 class Unify t where unify :: MonadEnv m => t -> t -> m ()
-instance Unify Pred where
+instance Unify Atom where
   unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
   unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
 
@@ -117,7 +117,7 @@ instance Fresh Term   where
                                            Nothing -> do {v' <- freshVar; put (Map.insert v v' st); return v'}
   freshF (out -> Term f tt) = term f `liftM` mapM freshF tt
 
-instance Fresh Pred   where freshF (Pred f tt) = Pred f `liftM` (mapM freshF tt)
+instance Fresh Atom   where freshF (Pred f tt) = Pred f `liftM` (mapM freshF tt)
 instance Fresh Clause where freshF (h :- c) = (:-) `liftM` freshF h `ap` mapM freshF c
 
 fresh =  (`evalStateT` mempty) . freshF
