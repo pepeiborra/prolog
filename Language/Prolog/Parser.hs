@@ -23,9 +23,9 @@ infixr 0 <|>
 program  :: CharParser () [Clause]
 program   = whiteSpace *> many1 clause <* eof
 
-clause    = (:-) <$> atom <*> query
+clause    = (:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return []) <* optional dot
 
-query = (reservedOp ":-" *> commaSep1 atom <|> return []) <* optional dot
+query = (reservedOp ":-" *> commaSep1 atom) <* optional dot
 atom = (reservedOp "!" >> return Cut <|>
        Pred <$> ident <*> (parens (commaSep1 term) <|> return [])) <?> "predicate"
 
