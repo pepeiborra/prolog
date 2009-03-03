@@ -6,7 +6,7 @@ module Language.Prolog.Syntax where
 import Control.Applicative
 import Data.Foldable
 import Data.Monoid
-import Data.Traversable
+import Data.Traversable as T
 
 import Text.PrettyPrint as Ppr
 
@@ -46,6 +46,10 @@ vars t = [ v | (out -> Var v) <- subterms t] where
     isVar (out -> Var{}) = True
     isVar _              = False
 
+foldIn :: Functor f => (f a -> a) -> In f -> a
+foldIn f  (In t) = f    (fmap (foldIn f) t)
+foldInM :: (Traversable f, Monad m) => (f a -> m a) -> In f -> m a
+foldInM f (In t) = f =<< T.mapM (foldInM f) t
 
 deriving instance Eq (f(In f)) => Eq (In f)
 deriving instance Show (f(In f)) => Show (In f)
