@@ -12,7 +12,7 @@ import Text.PrettyPrint as Ppr
 
 type Program = [Clause]
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data AtomF f   = Pred Ident [f] | Is f f | Cut deriving (Eq, Show)
+data AtomF f   = Pred Ident [f] | f :=: f | Is f f | Cut deriving (Eq, Show)
 data TermF f = Term Ident [f] | Tuple [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
 data In f = In {out::f (In f)}
 
@@ -76,6 +76,7 @@ instance Ppr Atom where
     ppr (Pred f tt) = text f <> parens(fcat (punctuate comma $ map ppr tt))
     ppr Cut         = text "!"
     ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
+    ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
 
 instance Ppr (f(In f)) => Ppr (In f) where ppr (In t) = ppr t
 instance Ppr Clause  where
@@ -101,14 +102,17 @@ instance Functor     AtomF where
     fmap     f (Pred a tt) = Pred a (fmap f tt)
     fmap     f Cut         = Cut
     fmap     f (Is a b)    = Is (f a) (f b)
+    fmap     f (a :=: b)   = f a :=: f b
 instance Foldable    AtomF where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
     foldMap  f (Is a b)    = f a `mappend` f b
+    foldMap  f (a :=: b)   = f a `mappend` f b
 instance Traversable AtomF where
     traverse f (Pred a tt) = Pred a <$> traverse f tt
     traverse f Cut         = pure Cut
-    traverse f (Is a b)    = Is <$> f a <*> f b
+    traverse f (Is a b)    = Is    <$> f a <*> f b
+    traverse f (a :=: b)   = (:=:) <$> f a <*> f b
 
 instance Functor TermF     where
     fmap     f (Term a tt) = Term a (fmap f tt)

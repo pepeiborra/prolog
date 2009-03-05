@@ -27,7 +27,15 @@ clause    = (:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return []) 
 
 query = (reservedOp ":-" *> commaSep1 atom) <* optional dot
 atom = (reservedOp "!" >> return Cut <|>
-       Pred <$> ident <*> (parens (commaSep1 term) <|> return [])) <?> "predicate"
+       Pred <$> ident <*> (parens (commaSep1 term) <|> return []) <|>
+       infixAtom
+       ) <?> "atom"
+
+infixAtom = do
+  t1 <- term
+  op <- pure (:=:) <* reservedOp "=" <|> pure Is <* reserved "is"
+  t2 <- term
+  return (t1 `op` t2)
 
 term_basic = (var <|>
               simple <|>
@@ -125,7 +133,8 @@ prologStyle= emptyDef
                 }
 
 prologDef = prologStyle
-            { reservedOpNames = [":-","|","!"]
+            { reservedOpNames = [":-","|","!","="]
+            , reservedNames  = ["is"]
             }
 
 identLiteral = lexeme (between (char '\'')
