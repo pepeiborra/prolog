@@ -12,8 +12,8 @@ import Text.PrettyPrint as Ppr
 
 type Program = [Clause]
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data AtomF f   = Pred Ident [f] | Cut  deriving (Eq, Show)
-data TermF f = Term Ident [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
+data AtomF f   = Pred Ident [f] | Is f f | Cut deriving (Eq, Show)
+data TermF f = Term Ident [f] | Tuple [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
 data In f = In {out::f (In f)}
 
 type Clause = ClauseF Atom
@@ -27,6 +27,9 @@ ident f = term f []
 
 term :: Ident -> [Term] -> Term
 term f = In . Term f
+
+tuple :: [Term] -> Term
+tuple = In . Tuple
 
 var :: Ident -> Term
 var  = In . Var . VName
@@ -59,6 +62,7 @@ instance Ppr a => Ppr (TermF a) where
     ppr (Var v)  = ppr v
     ppr (Term f []) = text f
     ppr (Term f tt) = text f <> parens (fcat (punctuate comma $ map ppr tt))
+    ppr (Tuple tt ) = ppr (Term "" tt)
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
     ppr Wildcard    = char '_'
@@ -70,6 +74,8 @@ instance Ppr VName where
 instance Ppr Atom where
     ppr (Pred f []) = text f
     ppr (Pred f tt) = text f <> parens(fcat (punctuate comma $ map ppr tt))
+    ppr Cut         = text "!"
+    ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
 
 instance Ppr (f(In f)) => Ppr (In f) where ppr (In t) = ppr t
 instance Ppr Clause  where
@@ -94,24 +100,30 @@ instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traver
 instance Functor     AtomF where
     fmap     f (Pred a tt) = Pred a (fmap f tt)
     fmap     f Cut         = Cut
+    fmap     f (Is a b)    = Is (f a) (f b)
 instance Foldable    AtomF where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
+    foldMap  f (Is a b)    = f a `mappend` f b
 instance Traversable AtomF where
     traverse f (Pred a tt) = Pred a <$> traverse f tt
     traverse f Cut         = pure Cut
+    traverse f (Is a b)    = Is <$> f a <*> f b
 
 instance Functor TermF     where
     fmap     f (Term a tt) = Term a (fmap f tt)
+    fmap     f (Tuple  tt) = Tuple  (fmap f tt)
     fmap     f (Var i)     = Var i
     fmap     f (Int i)     = Int i
     fmap     f (Float d)   = Float d
     fmap     f Wildcard    = Wildcard
 instance Foldable    TermF where
     foldMap  f (Term a tt) = foldMap f tt
+    foldMap  f (Tuple  tt) = foldMap f tt
     foldMap  f _           = mempty
 instance Traversable TermF where
     traverse f (Term a tt) = Term a <$> traverse f tt
+    traverse f (Tuple  tt) = Tuple  <$> traverse f tt
     traverse f (Var i)     = pure (Var i)
     traverse f (Int i)     = pure (Int i)
     traverse f (Float i)   = pure (Float i)

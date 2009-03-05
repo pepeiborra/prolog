@@ -41,7 +41,7 @@ term_basic = (var <|>
 
 simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
-    atuple = S.term "" <$> parens(commaSep1 term)
+    atuple = S.tuple <$> parens(commaSep1 term)
 
 var       = lexeme$ do
   first <- upper
