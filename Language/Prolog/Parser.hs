@@ -138,9 +138,10 @@ prologDef = prologStyle
             }
 
 identLiteral = lexeme (between (char '\'')
-                                  (char '\'' <?> "end of identifier")
-                                  (many (identLetter prologStyle))
+                               (char '\'' <?> "end of identifier")
+                               (many anythingButQuote)
                      ) <?> "quoted identifier"
+  where anythingButQuote = try ( char '\'' >> char '\'' >> return '\'' ) <|> noneOf "'"
 
 -- Applicative instances for Parsec
 -- ---------------------------------
