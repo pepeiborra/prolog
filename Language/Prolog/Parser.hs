@@ -23,17 +23,17 @@ infixr 0 <|>
 program  :: CharParser () [Clause]
 program   = whiteSpace *> many1 clause <* eof
 
-clause    = (:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return []) <* optional dot
+clause    = ((:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return [])) <* dot
 
 query = (reservedOp ":-" *> commaSep1 atom) <* optional dot
 atom = (reservedOp "!" >> return Cut <|>
-       Pred <$> ident <*> (parens (commaSep1 term) <|> return []) <|>
-       infixAtom
+        try infixAtom <|>
+        Pred <$> ident <*> (parens (commaSep1 term) <|> return [])
        ) <?> "atom"
 
 infixAtom = do
   t1 <- term
-  op <- pure (:=:) <* reservedOp "=" <|> pure Is <* reserved "is"
+  op <- (((\op x y -> Pred op [x,y]) <$> operator) <|> pure Is <* reserved "is") <?> "operator"
   t2 <- term
   return (t1 `op` t2)
 
@@ -44,8 +44,8 @@ term_basic = (var <|>
               S.float <$> float <|>
               (foldr cons nil . map (S.ident . (:[]))) <$> stringLiteral <|>
               try list1 <|>
-              list2)
-             <?> "term"
+              list2
+             ) <?> "term"
 
 simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
@@ -59,9 +59,7 @@ var       = lexeme$ do
 ident      = (identifier  <|>
              identLiteral <|>
              operator    <|>
---           string "[]" >> return nil <|>
              string "{}" <|>
---           string "!"  >> return cut <|>
              string ";"
             ) <?> "ident"
 
@@ -126,14 +124,14 @@ prologStyle= emptyDef
                 , identStart     = do {c <- letter; guard (isLower c); return c}
                 , identLetter	 = alphaNum <|> oneOf "_'"
                 , opStart	 = opLetter prologStyle
-                , opLetter	 = oneOf "+-*/\\^<>=`~:.?@#$&"
+                , opLetter	 = oneOf "<>!=~|&"
                 , reservedOpNames= []
                 , reservedNames  = []
                 , caseSensitive  = True
                 }
 
 prologDef = prologStyle
-            { reservedOpNames = [":-","|","!","="]
+            { reservedOpNames = [":-","|","!"]
             , reservedNames  = ["is"]
             }
 

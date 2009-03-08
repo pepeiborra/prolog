@@ -1,6 +1,7 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 module Language.Prolog.Syntax where
 
 import Control.Applicative
@@ -12,8 +13,8 @@ import Text.PrettyPrint as Ppr
 
 type Program = [Clause]
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data AtomF f   = Pred Ident [f] | f :=: f | Is f f | Cut deriving (Eq, Show)
-data TermF f = Term Ident [f] | Tuple [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
+data AtomF f   = Pred {pred::Ident,    args::[f]} | f :=: f | Is f f | Cut deriving (Eq, Show)
+data TermF f   = Term {functor::Ident, fargs::[f]} | Tuple [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
 data In f = In {out::f (In f)}
 
 type Clause = ClauseF Atom
