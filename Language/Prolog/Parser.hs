@@ -121,8 +121,8 @@ prologStyle= emptyDef
                 , commentEnd     = "*/"
                 , commentLine    = "%"
                 , nestedComments = True
-                , identStart     = do {c <- letter; guard (isLower c); return c}
-                , identLetter	 = alphaNum <|> oneOf "_'"
+                , identStart     = oneOf ("+-*/\\^`~:.?@#=$&" ++ ['a'..'z'])
+                , identLetter	 = alphaNum <|> oneOf "+-*=/\\^`~:?@#$&_"
                 , opStart	 = opLetter prologStyle
                 , opLetter	 = oneOf "<>!=~|&"
                 , reservedOpNames= []
