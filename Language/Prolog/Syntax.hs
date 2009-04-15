@@ -13,8 +13,18 @@ import Text.PrettyPrint as Ppr
 
 type Program = [Clause]
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data AtomF f   = Pred {pred::Ident,    args::[f]} | f :=: f | Is f f | Cut deriving (Eq, Show)
-data TermF f   = Term {functor::Ident, fargs::[f]} | Tuple [f] | Int Integer | Float Double | Var VName | Wildcard deriving (Eq, Show)
+data AtomF f   = Pred {pred::Ident,    args::[f]}
+               | f :=: f
+               | Is f f
+               | Cut deriving (Eq, Show)
+data TermF f   = Term {functor::Ident, fargs::[f]}
+               | Tuple [f]
+               | Int Integer
+               | Float Double
+               | Var VName
+               | String String
+               | Wildcard deriving (Eq, Show)
+
 data In f = In {out::f (In f)}
 
 type Clause = ClauseF Atom
@@ -38,8 +48,9 @@ var  = In . Var . VName
 var' :: Int -> Term
 var' = In . Var . Auto
 
-int = In . Int
-float = In . Float
+int      = In . Int
+float    = In . Float
+string   = In . String
 wildcard = In Wildcard
 
 subterms :: Term -> [Term]
@@ -50,9 +61,9 @@ vars t = [ v | (out -> Var v) <- subterms t] where
     isVar (out -> Var{}) = True
     isVar _              = False
 
-foldIn :: Functor f => (f a -> a) -> In f -> a
+foldIn           :: Functor f => (f a -> a) -> In f -> a
 foldIn f  (In t) = f    (fmap (foldIn f) t)
-foldInM :: (Traversable f, Monad m) => (f a -> m a) -> In f -> m a
+foldInM          :: (Traversable f, Monad m) => (f a -> m a) -> In f -> m a
 foldInM f (In t) = f =<< T.mapM (foldInM f) t
 
 deriving instance Eq (f(In f)) => Eq (In f)

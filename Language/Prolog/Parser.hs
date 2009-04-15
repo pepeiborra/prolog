@@ -11,7 +11,7 @@ import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
 
 import qualified Language.Prolog.Syntax as S
-import Language.Prolog.Syntax hiding (term, var, ident, int, float)
+import Language.Prolog.Syntax hiding (term, var, ident, int, float, string)
 
 type Comment = String
 
@@ -37,13 +37,13 @@ infixAtom = do
   t2 <- term
   return (t1 `op` t2)
 
-term_basic = (var <|>
-              simple <|>
+term_basic = (var                                  <|>
+              simple                               <|>
               lexeme (char '_') >> return wildcard <|>
-              S.int <$> integer <|>
-              S.float <$> float <|>
-              (foldr cons nil . map (S.ident . (:[]))) <$> stringLiteral <|>
-              try list1 <|>
+              S.int    <$> integer                 <|>
+              S.float  <$> float                   <|>
+              S.string <$> stringLiteral           <|>
+              try list1                            <|>
               list2
              ) <?> "term"
 
