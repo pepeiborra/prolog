@@ -20,7 +20,7 @@ infixr 0 <|>
 (<|>) :: Alternative f => f a -> f a -> f a
 (<|>) = (A.<|>)
 
-program  :: CharParser () [Clause]
+program  :: CharParser () [Clause String]
 program   = whiteSpace *> many1 clause <* eof
 
 clause    = ((:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return [])) <* dot
