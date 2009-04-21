@@ -1,13 +1,12 @@
 name: prolog
-version: 0.1.20090420
+version: 0.1.20090421
+build-type: Simple
 Cabal-Version:  >= 1.2
-license: AllRightsReserved
-license-file: ""
-copyright: Pepe Iborra, All Rights Reserved
-homepage:
-synopsis: Prolog syntax and Parsec based parser
+license: PublicDomain
+homepage: http://github.com/pepeiborra/prolog
+synopsis: Prolog Parsec based parser
 description: 
-category:
+category: Language
 author: Pepe Iborra
 
 Library
