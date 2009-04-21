@@ -3,6 +3,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+
+-- | This is a simple Prolog evaluator written just for fun.
+--   It does not support anything apart from basic Logic Programming,
+--   i.e. no Cut, no arithmetic, no E/S.
+
 module Language.Prolog.Semantics where -- (eval, debug, unify, zonk, Environment) where
 
 import Control.Applicative
