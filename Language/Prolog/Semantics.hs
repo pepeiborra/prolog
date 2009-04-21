@@ -13,7 +13,7 @@ module Language.Prolog.Semantics where -- (eval, debug, unify, zonk, Environment
 import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), join, ap, (>=>))
-import Control.Monad.Free
+import Control.Monad.Free hiding (mapM)
 import Control.Monad.Free.Zip
 import Control.Monad.State  (StateT(..), MonadState(..), execStateT, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
