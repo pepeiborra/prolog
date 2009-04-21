@@ -1,5 +1,5 @@
 name: prolog
-version: 0.1.20090416
+version: 0.1.20090420
 Cabal-Version:  >= 1.2
 license: AllRightsReserved
 license-file: ""
@@ -12,7 +12,7 @@ author: Pepe Iborra
 
 Library
   buildable: True
-  build-depends: base, parsec, pretty, containers, mtl
+  build-depends: base, parsec, pretty, containers, mtl, control-monad-free >= 0.4 
   exposed-modules:
      Language.Prolog.Parser
      Language.Prolog.Syntax

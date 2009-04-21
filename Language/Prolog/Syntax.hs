@@ -2,16 +2,17 @@
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE OverlappingInstances #-}
 module Language.Prolog.Syntax where
 
 import Control.Applicative
+import Control.Monad.Free
 import Data.Foldable
 import Data.Monoid
 import Data.Traversable as T
 
 import Text.PrettyPrint as Ppr
 
-type Program id= [Clause id]
 data ClauseF f = f :- [f] deriving (Eq, Show)
 data AtomF id f= Pred {pred::id,args::[f]}
                | f :=: f
@@ -21,56 +22,53 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | Tuple [f]
                | Int Integer
                | Float Double
-               | Var VName
                | String String
                | Wildcard deriving (Eq, Show)
 
-data In f = In {out::f (In f)}
-
-type Clause id = ClauseF (Atom id)
-type Atom   id = AtomF id (Term id)
-type Term   id = In (TermF id)
 data VName  = VName String | Auto Int deriving (Eq, Show)
 
-ident :: id -> Term id
+type Program'' id term = [Clause'' id term]
+type Clause''  id term = ClauseF (AtomF id term)
+
+type Program' id var = Program'' id (Term' id var)
+type Clause'  id var = Clause''  id (Term' id var)
+type Atom'    id var = AtomF     id (Term' id var)
+type Term'    id var = Free (TermF id) var
+
+type Program id = [Clause id]
+type Clause  id = ClauseF (Atom id)
+type Atom    id = AtomF id (Term id)
+type Term    id = Term' id VName
+
+ident :: id -> Term' id a
 ident f = term f []
 
-term :: id -> [Term id] -> Term id
-term f = In . Term f
+term :: id -> [Term' id a] -> Term' id a
+term f = Impure . Term f
 
-tuple :: [Term id] -> Term id
-tuple = In . Tuple
+tuple :: [Term' id a] -> Term' id a
+tuple = Impure . Tuple
 
 var :: String -> Term id
-var  = In . Var . VName
+var  = return . VName
 
 var' :: Int -> Term id
-var' = In . Var . Auto
+var' = return . Auto
 
-int      = In . Int
-float    = In . Float
-string   = In . String
-wildcard = In Wildcard
+int      = Impure . Int
+float    = Impure . Float
+string   = Impure . String
+wildcard = Impure Wildcard
 
-subterms :: Term id -> [Term id]
-subterms (In t) = In t : Prelude.concat (subterms <$> toList t)
+subterms :: Term' id a -> [Term' id a]
+subterms (Impure t) = Impure t : Prelude.concat (subterms <$> toList t)
+subterms _ = []
 
-vars :: Term id -> [VName]
-vars t = [ v | (out -> Var v) <- subterms t] where
-    isVar (out -> Var{}) = True
-    isVar _              = False
-
-foldIn           :: Functor f => (f a -> a) -> In f -> a
-foldIn f  (In t) = f    (fmap (foldIn f) t)
-foldInM          :: (Traversable f, Monad m) => (f a -> m a) -> In f -> m a
-foldInM f (In t) = f =<< T.mapM (foldInM f) t
-
-deriving instance Eq (f(In f)) => Eq (In f)
-deriving instance Show (f(In f)) => Show (In f)
+vars :: Term' id a -> [a]
+vars = toList
 
 class Ppr a where ppr :: a -> Doc
 instance (Show id, Ppr a) => Ppr (TermF id a) where
-    ppr (Var v)  = ppr v
     ppr (Term f []) = text (show f)
     ppr (Term f tt) = text (show f) <> parens (fcat (punctuate comma $ map ppr tt))
     ppr (Tuple tt ) = ppr (Term "" tt)
@@ -82,23 +80,27 @@ instance Ppr VName where
     ppr (VName v)  = text v
     ppr (Auto v_i) = text "V" <> Ppr.int v_i
 
-instance Show id => Ppr (Atom id) where
+instance (Show idp, Ppr term) => Ppr (AtomF idp term) where
     ppr (Pred f []) = text (show f)
     ppr (Pred f tt) = text (show f) <> parens(fcat (punctuate comma $ map ppr tt))
     ppr Cut         = text "!"
     ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
     ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
 
-instance Ppr (f(In f)) => Ppr (In f) where ppr (In t) = ppr t
+instance (Ppr (f(Free f a)), Ppr a) => Ppr (Free f a) where ppr (Impure t) = ppr t; ppr (Pure a) = ppr a
 instance Ppr a => Ppr (ClauseF a)  where
     ppr (h :- []) = ppr h <> char '.'
     ppr (h :- t) = ppr h <+> text ":-" <+> fcat(punctuate comma (map ppr t)) <> char '.'
 
-instance Show id => Ppr (Program id) where ppr = vcat . map ppr
+instance (Show idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
+
+--instance Ppr Char where ppr = char
+instance Ppr String where ppr = text
+instance Ppr a => Ppr [a]     where ppr = brackets . hcat . punctuate comma . map ppr
+instance (Ppr a, Ppr b) => Ppr (a,b) where ppr (a,b) = parens (ppr a <> comma <> ppr b)
+instance (Ppr a, Ppr b, Ppr c) => Ppr (a,b,c) where ppr (a,b,c) = parens (ppr a <> comma <> ppr b <> comma <> ppr c)
 
 --instance Ppr String where ppr = text
---instance (Ppr a, Ppr b) => Ppr (a,b) where ppr = parens (ppr a <> comma <+> ppr b)
-
 
 {-
 instance Show Program where show = render . ppr
@@ -134,7 +136,6 @@ instance Traversable (AtomF id) where
 instance Functor (TermF id) where
     fmap     f (Term a tt) = Term a (fmap f tt)
     fmap     f (Tuple  tt) = Tuple  (fmap f tt)
-    fmap     f (Var i)     = Var i
     fmap     f (Int i)     = Int i
     fmap     f (Float d)   = Float d
     fmap     f Wildcard    = Wildcard
@@ -145,7 +146,7 @@ instance Foldable (TermF id) where
 instance Traversable (TermF id) where
     traverse f (Term a tt) = Term a <$> traverse f tt
     traverse f (Tuple  tt) = Tuple  <$> traverse f tt
-    traverse f (Var i)     = pure (Var i)
     traverse f (Int i)     = pure (Int i)
     traverse f (Float i)   = pure (Float i)
     traverse f Wildcard    = pure Wildcard
+
