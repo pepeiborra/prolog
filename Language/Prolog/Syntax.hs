@@ -1,8 +1,9 @@
-{-# LANGUAGE StandaloneDeriving, FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverlappingInstances #-}
+
 module Language.Prolog.Syntax where
 
 import Control.Applicative
@@ -68,9 +69,10 @@ vars :: Term' id a -> [a]
 vars = toList
 
 class Ppr a where ppr :: a -> Doc
-instance (Show id, Ppr a) => Ppr (TermF id a) where
-    ppr (Term f []) = text (show f)
-    ppr (Term f tt) = text (show f) <> parens (fcat (punctuate comma $ map ppr tt))
+
+instance (Ppr a, Ppr id) => Ppr (TermF id a) where
+    ppr (Term f []) = ppr f
+    ppr (Term f tt) = ppr f <> parens (fcat (punctuate comma $ map ppr tt))
     ppr (Tuple tt ) = ppr (Term "" tt)
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
@@ -80,9 +82,9 @@ instance Ppr VName where
     ppr (VName v)  = text v
     ppr (Auto v_i) = text "V" <> Ppr.int v_i
 
-instance (Show idp, Ppr term) => Ppr (AtomF idp term) where
-    ppr (Pred f []) = text (show f)
-    ppr (Pred f tt) = text (show f) <> parens(fcat (punctuate comma $ map ppr tt))
+instance (Ppr idp, Ppr term) => Ppr (AtomF idp term) where
+    ppr (Pred f []) = ppr f
+    ppr (Pred f tt) = ppr f <> parens(fcat (punctuate comma $ map ppr tt))
     ppr Cut         = text "!"
     ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
     ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
@@ -92,7 +94,7 @@ instance Ppr a => Ppr (ClauseF a)  where
     ppr (h :- []) = ppr h <> char '.'
     ppr (h :- t) = ppr h <+> text ":-" <+> fcat(punctuate comma (map ppr t)) <> char '.'
 
-instance (Show idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
+instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
 
 --instance Ppr Char where ppr = char
 instance Ppr String where ppr = text

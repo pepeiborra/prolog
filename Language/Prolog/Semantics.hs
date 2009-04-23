@@ -33,7 +33,7 @@ type Goal id var = [Atom id]
 type Environment id var = Map var (Term' id var)
 deriving instance Ord VName
 
-instance (Ppr var, Show id) => Ppr (Environment id var) where
+instance (Ppr var, Ppr id) => Ppr (Environment id var) where
     ppr = fcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList
 
 restrictTo :: Ord var => [var] -> Environment id var -> Environment id var
