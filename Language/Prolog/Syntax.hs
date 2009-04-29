@@ -72,7 +72,7 @@ class Ppr a where ppr :: a -> Doc
 
 instance (Ppr a, Ppr id) => Ppr (TermF id a) where
     ppr (Term f []) = ppr f
-    ppr (Term f tt) = ppr f <> parens (fcat (punctuate comma $ map ppr tt))
+    ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
     ppr (Tuple tt ) = ppr (Term "" tt)
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
@@ -84,7 +84,7 @@ instance Ppr VName where
 
 instance (Ppr idp, Ppr term) => Ppr (AtomF idp term) where
     ppr (Pred f []) = ppr f
-    ppr (Pred f tt) = ppr f <> parens(fcat (punctuate comma $ map ppr tt))
+    ppr (Pred f tt) = ppr f <> parens(hcat (punctuate comma $ map ppr tt))
     ppr Cut         = text "!"
     ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
     ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
@@ -92,7 +92,7 @@ instance (Ppr idp, Ppr term) => Ppr (AtomF idp term) where
 instance (Ppr (f(Free f a)), Ppr a) => Ppr (Free f a) where ppr (Impure t) = ppr t; ppr (Pure a) = ppr a
 instance Ppr a => Ppr (ClauseF a)  where
     ppr (h :- []) = ppr h <> char '.'
-    ppr (h :- t) = ppr h <+> text ":-" <+> fcat(punctuate comma (map ppr t)) <> char '.'
+    ppr (h :- t) = ppr h <+> text ":-" <+> hcat(punctuate comma (map ppr t)) <> char '.'
 
 instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
 
