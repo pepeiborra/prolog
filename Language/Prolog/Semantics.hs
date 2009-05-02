@@ -1,3 +1,4 @@
+
 {-# LANGUAGE NoMonomorphismRestriction, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -33,20 +34,20 @@ import Debug.Trace
 import Language.Prolog.Syntax
 
 type Goal id term = AtomF id term
-newtype Environment id var = Env {unEnv::Map var (Term' id var)}
-  deriving (Eq, Show, Monoid)
+newtype Environment termF var = Env {unEnv::Map var (Free termF var)}
+  deriving Monoid
 liftEnv f (Env e) = Env (f e)
 
 deriving instance Ord VName
 
-instance (Ppr var, Ppr id) => Ppr (Environment id var) where
+instance (Ppr var, Ppr (Free termF var)) => Ppr (Environment termF var) where
     ppr = braces . hcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList . unEnv
 
 restrictTo :: Ord var => [var] -> Environment id var -> Environment id var
 restrictTo vv = liftEnv f where
   f e = Map.intersectionWith const e (Map.fromDistinctAscList (zip vv (repeat undefined)))
 
-eval  :: (Ppr id, Ppr idp, Eq id, Eq idp, term ~ Term' id VName) => Program'' idp term -> Goal idp term -> [Environment id VName]
+eval  :: (Ppr id, Ppr idp, Eq id, Eq idp, term ~ Term' id VName) => Program'' idp term -> Goal idp term -> [Environment (TermF id) VName]
 eval pgm q = (fmap (restrictTo (snub $ foldMap vars q) .  zonkEnv . snd) . execEnvM' i . runWriterT . run pgm) q
     where zonkEnv env = liftEnv (\m -> head $ evalEnvM env (mapM zonk m)) env
           i = maximum [ i | Auto i <- foldMap vars q] + 1
@@ -55,7 +56,7 @@ debug :: (Eq idp, Ppr id, Ppr idp, Eq id, term ~ Term' id VName) => Program'' id
 debug pgm q =  ((`evalStateT` (Sum i, mempty)) . unEnvM . execWriterT . run pgm) q
   where
     i = maximum [ i | Auto i <- foldMap vars q] + 1
-run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[Goal idp term]] m) => Program'' idp term -> Goal idp term -> m ()
+--run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[Goal idp term]] m) => Program'' idp term -> Goal idp term -> m ()
 run pgm p = go [p] where
   go []         = return ()
   go (Cut:rest) = go rest
@@ -68,12 +69,12 @@ run pgm p = go [p] where
 --        trace (show $ ppr env <+> ppr zprob) (return ())
         go (t ++ rest)
 
-class Eq id => Unify id var t | t -> id var where unify :: MonadEnv id var m => t -> t -> m ()
-instance (Eq id, Eq idp) => Unify id var (AtomF idp (Term' id var)) where
+class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
+instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (AtomF idp (Free termF var)) where
   unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
   unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
 
-instance Eq id => Unify id var (Term' id var) where
+instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
   unify = unifyF where
    unifyF t s = do
     t' <- find t
@@ -91,14 +92,28 @@ instance Eq id => Unify id var (Term' id var) where
    zipTermM_ _ Wildcard      Wildcard                 = return ()
    zipTermM_ _ _ _ = fail "Structure mismatch"
 
-class (Ord var, Monad m) => MonadEnv id var m | m -> id var where
-    varBind :: var -> Term' id var -> m ()
-    getEnv  :: m (Environment id var)
-    putEnv  :: Environment id var -> m ()
+
+instance (Functor f, Foldable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
+  unify = unifyF where
+   unifyF t s = do
+    t' <- find t
+    s' <- find s
+    case (t', s') of
+      (Pure vt, Pure vs) -> if vt /= vs then varBind vt s' else return ()
+      (Pure vt, _)  -> if vt `Set.member` Set.fromList (vars s') then fail "occurs" else varBind vt s'
+      (_, Pure vs)  -> if vs `Set.member` Set.fromList (vars t') then fail "occurs" else varBind vs t'
+      (Impure t, Impure s)
+        | (const () <$> t) == (const () <$> s) -> zipWithM_ unifyF (toList t) (toList s)
+        | otherwise -> fail "structure mismatch"
+
+class (Ord var, Functor termF, Monad m) => MonadEnv termF var m | m -> termF var where
+    varBind :: var -> Free termF var -> m ()
+    getEnv  :: m (Environment termF var)
+    putEnv  :: Environment termF var -> m ()
 
 lookupEnv v =  (Map.lookup v . unEnv) `liftM` getEnv
 
-find :: MonadEnv id var m => Term' id var -> m (Term' id var)
+find :: MonadEnv termF var m => Free termF var -> m (Free termF var)
 find t0@(Pure v) = go v
   where
    go v = lookupEnv v >>= \ mb_t ->
@@ -111,7 +126,7 @@ find t0 = return t0
 liftList :: MonadPlus m => [a] -> m a
 liftList = msum . map return
 
-zonk :: (MonadEnv id var m) => Term' id var -> m (Term' id var)
+zonk :: (Traversable termF, MonadEnv termF var m) => Free termF var -> m (Free termF var)
 zonk t =  liftM join  (T.mapM f t)
   where f x = do
           x' <- lookupEnv x
@@ -119,39 +134,39 @@ zonk t =  liftM join  (T.mapM f t)
             Nothing -> return (return x)
             Just x' -> zonk x'
 
-newtype EnvM id var a = EnvM {unEnvM:: (StateT (Sum Int, Environment id var) []) a}
-    deriving (Functor, Monad, MonadPlus, MonadState (Sum Int, Environment id var))
-instance Applicative (EnvM id var) where (<*>) = ap; pure = return
+newtype EnvM termF var a = EnvM {unEnvM:: (StateT (Sum Int, Environment termF var) []) a}
+    deriving (Functor, Monad, MonadPlus, MonadState (Sum Int, Environment termF var))
+instance Applicative (EnvM termF var) where (<*>) = ap; pure = return
 
 execEnvM = (`execStateT` mempty) . unEnvM
 execEnvM' i = (`execStateT` (Sum i, mempty)) . unEnvM
 evalEnvM  env   = (`evalStateT` (mempty,env)) . unEnvM
 evalEnvM' env i = (`evalStateT` (Sum  i,env)) . unEnvM
 
-instance Ord var => MonadEnv id var (EnvM id var) where
+instance (Functor termF, Ord var) => MonadEnv termF var (EnvM termF var) where
   getEnv = snd `liftM` get
   putEnv = modify . second . const
   varBind v t = do {e <- getEnv; putEnv (liftEnv (Map.insert v t) e)}
 
-instance (Monad m, Ord var) => MonadEnv id var (StateT (Environment id var) m) where
+instance (Monad m, Functor termF, Ord var) => MonadEnv termF var (StateT (Environment termF var) m) where
   getEnv = get
   putEnv = modify . const
   varBind v t = do {e <- getEnv; putEnv (liftEnv (Map.insert v t) e)}
 
-instance (Monoid w, MonadEnv id var m) => MonadEnv id var (WriterT w m) where
+instance (Monoid w, Functor termF, MonadEnv termF var m) => MonadEnv termF var (WriterT w m) where
   getEnv = lift getEnv
   putEnv = lift . putEnv
   varBind = (lift.) . varBind
 
 deriving instance Enum (Sum Int)
-class Monad m => MonadFresh id var m where freshVar :: m (Term' id var)
-instance MonadFresh id VName (EnvM id VName)   where freshVar = (var'.getSum.fst) <$> get <* modify (first succ)
+class Monad m => MonadFresh termF var m where freshVar :: m (Free termF var)
+instance Functor termF =>  MonadFresh termF VName (EnvM termF VName) where freshVar = (var'.getSum.fst) <$> get <* modify (first succ)
 --instance MonadFresh id VName (State (Sum Int)) where freshVar = (var'.getSum) <$> get <* modify succ
-instance MonadFresh id var m => MonadFresh id var (StateT s m) where freshVar = lift freshVar
-instance (Monoid w, MonadFresh id var m) => MonadFresh id var (WriterT w m) where freshVar = lift freshVar
+instance MonadFresh termF var m => MonadFresh termF var (StateT s m) where freshVar = lift freshVar
+instance (Monoid w, MonadFresh termF var m) => MonadFresh termF var (WriterT w m) where freshVar = lift freshVar
 
 
-fresh :: forall id var m .  (Ord var, MonadEnv id var m, MonadFresh id var m) => Term' id var -> m(Term' id var)
+fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh termF var m) => Free termF var -> m(Free termF var)
 fresh = go where
   go  = liftM join . T.mapM f
   f v = do

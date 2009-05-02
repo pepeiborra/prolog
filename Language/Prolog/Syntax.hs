@@ -1,6 +1,7 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverlappingInstances #-}
 
@@ -50,10 +51,10 @@ term f = Impure . Term f
 tuple :: [Term' id a] -> Term' id a
 tuple = Impure . Tuple
 
-var :: String -> Term id
+var :: (Functor f, term ~ Free f VName) =>  String -> term
 var  = return . VName
 
-var' :: Int -> Term id
+var' :: (Functor f, term ~ Free f VName) => Int -> term
 var' = return . Auto
 
 int      = Impure . Int
@@ -61,11 +62,16 @@ float    = Impure . Float
 string   = Impure . String
 wildcard = Impure Wildcard
 
-subterms :: Term' id a -> [Term' id a]
+subterms :: (term ~ Free termF var, Foldable termF) => term -> [term]
 subterms (Impure t) = Impure t : Prelude.concat (subterms <$> toList t)
 subterms _ = []
 
-vars :: Term' id a -> [a]
+termFunctor :: MonadPlus m => Term' id a -> m id
+termFunctor = foldFree (const mzero) f where
+    f (Term f tt) = return f `mplus` Data.Foldable.msum tt
+    f _ = mzero
+
+vars :: (Functor termF, Foldable termF) => Free termF var -> [var]
 vars = toList
 
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
