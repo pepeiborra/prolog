@@ -68,6 +68,19 @@ subterms _ = []
 vars :: Term' id a -> [a]
 vars = toList
 
+mapTermId :: (id -> id') -> TermF id a -> TermF id' a
+mapTermId f (Term id a) = Term (f id) a
+mapTermId _ (Tuple tt)  = Tuple tt
+mapTermId _ (Int i)     = Int i
+mapTermId _ (Float f)   = Float f
+mapTermId _ (String s)  = String s
+mapTermId _ Wildcard    = Wildcard
+
+mapPredId f (Pred id tt) = Pred (f id) tt
+mapPredId _ (Is t1 t2)   = Is t1 t2
+mapPredId _ (t1 :=: t2)  = t1 :=: t2
+mapPredId _ Cut          = Cut
+
 class Ppr a where ppr :: a -> Doc
 
 instance (Ppr a, Ppr id) => Ppr (TermF id a) where
