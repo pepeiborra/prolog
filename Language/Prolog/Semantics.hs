@@ -56,17 +56,16 @@ debug pgm q =  ((`evalStateT` (Sum i, mempty)) . unEnvM . execWriterT . run pgm)
   where
     i = maximum [ i | Auto i <- foldMap vars q] + 1
 --run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[GoalF idp term]] m) => Program'' idp term -> Goal idp term -> m ()
-run pgm p = go [p] where
+run pgm query = go [query] where
   go []         = return ()
   go (Cut:rest) = go rest
-  go prob@(p:rest) = do
-        env <- getEnv
+  go prob@(goal:rest) = do
         mapM2 zonk prob >>= \prob' -> tell [prob']
-        h :- t <- liftList pgm >>= \r -> (flip evalStateT (mempty `asTypeOf` env) . mapM2 fresh) r -- TODO: modify for cut
-        unify p h `const` env `const` (h :- t) `const` rest
---        zprob <- mapM2 zonk (t ++ rest)
---        trace (show $ ppr env <+> ppr zprob) (return ())
+        h :- t <- liftList pgm >>= freshInstance
+        unify goal h
         go (t ++ rest)
+
+  freshInstance = flip evalStateT (mempty `asTypeOf` env) . mapM2 fresh
 
 class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
 instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
