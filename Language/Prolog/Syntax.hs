@@ -16,7 +16,7 @@ import Data.Traversable as T
 import Text.PrettyPrint as Ppr
 
 data ClauseF f = f :- [f] deriving (Eq, Show)
-data AtomF id f= Pred {pred::id,args::[f]}
+data GoalF id f= Pred {pred::id,args::[f]}
                | f :=: f
                | Is f f
                | Cut deriving (Eq, Show)
@@ -30,16 +30,16 @@ data TermF id f= Term {functor::id, fargs::[f]}
 data VName  = VName String | Auto Int deriving (Eq, Show)
 
 type Program'' id term = [Clause'' id term]
-type Clause''  id term = ClauseF (AtomF id term)
+type Clause''  id term = ClauseF (GoalF id term)
 
 type Program' id var = Program'' id (Term' id var)
 type Clause'  id var = Clause''  id (Term' id var)
-type Atom'    id var = AtomF     id (Term' id var)
+type Goal'    id var = GoalF     id (Term' id var)
 type Term'    id var = Free (TermF id) var
 
 type Program id = [Clause id]
-type Clause  id = ClauseF (Atom id)
-type Atom    id = AtomF id (Term id)
+type Clause  id = ClauseF (Goal id)
+type Goal    id = GoalF id (Term id)
 type Term    id = Term' id VName
 
 ident :: id -> Term' id a
@@ -101,7 +101,7 @@ instance Ppr VName where
     ppr (VName v)  = text v
     ppr (Auto v_i) = text "V" <> Ppr.int v_i
 
-instance (Ppr idp, Ppr term) => Ppr (AtomF idp term) where
+instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
     ppr (Pred f []) = ppr f
     ppr (Pred f tt) = ppr f <> parens(hcat (punctuate comma $ map ppr tt))
     ppr Cut         = text "!"
@@ -126,7 +126,7 @@ instance (Ppr a, Ppr b, Ppr c) => Ppr (a,b,c) where ppr (a,b,c) = parens (ppr a 
 {-
 instance Show Program where show = render . ppr
 instance Show Clause  where show = render . ppr
-instance Show Atom    where show = render . ppr
+instance Show Goal    where show = render . ppr
 instance Show Term    where show = render . ppr
 instance Show VName   where show = render . ppr
 -}
@@ -138,17 +138,17 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-instance Functor     (AtomF id) where
+instance Functor     (GoalF id) where
     fmap     f (Pred a tt) = Pred a (fmap f tt)
     fmap     f Cut         = Cut
     fmap     f (Is a b)    = Is (f a) (f b)
     fmap     f (a :=: b)   = f a :=: f b
-instance Foldable    (AtomF id) where
+instance Foldable    (GoalF id) where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
     foldMap  f (Is a b)    = f a `mappend` f b
     foldMap  f (a :=: b)   = f a `mappend` f b
-instance Traversable (AtomF id) where
+instance Traversable (GoalF id) where
     traverse f (Pred a tt) = Pred a <$> traverse f tt
     traverse f Cut         = pure Cut
     traverse f (Is a b)    = Is    <$> f a <*> f b

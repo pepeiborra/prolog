@@ -33,7 +33,6 @@ import Debug.Trace
 
 import Language.Prolog.Syntax
 
-type Goal id term = AtomF id term
 newtype Environment termF var = Env {unEnv::Map var (Free termF var)}
   deriving Monoid
 liftEnv f (Env e) = Env (f e)
@@ -47,16 +46,16 @@ restrictTo :: Ord var => [var] -> Environment id var -> Environment id var
 restrictTo vv = liftEnv f where
   f e = Map.intersectionWith const e (Map.fromDistinctAscList (zip vv (repeat undefined)))
 
-eval  :: (Ppr id, Ppr idp, Eq id, Eq idp, term ~ Term' id VName) => Program'' idp term -> Goal idp term -> [Environment (TermF id) VName]
+eval  :: (Ppr id, Ppr idp, Eq id, Eq idp, term ~ Term' id VName) => Program'' idp term -> GoalF idp term -> [Environment (TermF id) VName]
 eval pgm q = (fmap (restrictTo (snub $ foldMap vars q) .  zonkEnv . snd) . execEnvM' i . runWriterT . run pgm) q
     where zonkEnv env = liftEnv (\m -> head $ evalEnvM env (mapM zonk m)) env
           i = maximum [ i | Auto i <- foldMap vars q] + 1
 
-debug :: (Eq idp, Ppr id, Ppr idp, Eq id, term ~ Term' id VName) => Program'' idp term -> Goal idp term -> [ [[Goal idp term]] ]
+debug :: (Eq idp, Ppr id, Ppr idp, Eq id, term ~ Term' id VName) => Program'' idp term -> GoalF idp term -> [ [[GoalF idp term]] ]
 debug pgm q =  ((`evalStateT` (Sum i, mempty)) . unEnvM . execWriterT . run pgm) q
   where
     i = maximum [ i | Auto i <- foldMap vars q] + 1
---run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[Goal idp term]] m) => Program'' idp term -> Goal idp term -> m ()
+--run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[GoalF idp term]] m) => Program'' idp term -> Goal idp term -> m ()
 run pgm p = go [p] where
   go []         = return ()
   go (Cut:rest) = go rest
@@ -70,7 +69,7 @@ run pgm p = go [p] where
         go (t ++ rest)
 
 class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
-instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (AtomF idp (Free termF var)) where
+instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
   unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
   unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
 

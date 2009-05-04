@@ -23,15 +23,15 @@ infixr 0 <|>
 program  :: CharParser () [Clause String]
 program   = whiteSpace *> many1 clause <* eof
 
-clause    = ((:-) <$> atom <*> (reservedOp ":-" *> commaSep1 atom <|> return [])) <* dot
+clause    = ((:-) <$> goal <*> (reservedOp ":-" *> commaSep1 goal <|> return [])) <* dot
 
-query = (reservedOp ":-" *> commaSep1 atom) <* optional dot
-atom = (reservedOp "!" >> return Cut <|>
-        try infixAtom <|>
+query = (reservedOp ":-" *> commaSep1 goal) <* optional dot
+goal = (reservedOp "!" >> return Cut <|>
+        try infixGoal <|>
         Pred <$> ident <*> (parens (commaSep1 term) <|> return [])
-       ) <?> "atom"
+       ) <?> "goal"
 
-infixAtom = do
+infixGoal = do
   t1 <- term
   op <- (((\op x y -> Pred op [x,y]) <$> operator) <|> pure Is <* reserved "is") <?> "operator"
   t2 <- term
@@ -75,7 +75,6 @@ list2 = brackets $ do
 
 cons x y =  S.term "." [x,y]
 nil      = (S.term "[]" [])
-
 -- Expressions
 -- ------------
 term    = buildExpressionParser table factor
