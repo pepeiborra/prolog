@@ -68,12 +68,30 @@ run pgm query = go [query] where
 
   freshInstance c = getEnv >>= \env -> evalStateT (mapM2 (lift . fresh) c) (mempty `asTypeOf` env)
 
+-- Unification
+-- -----------
 class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
 instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
   unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
   unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
 
+-- Generic instance
+instance (Functor f, Foldable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
+  unify = unifyF where
+   unifyF t s = do
+    t' <- find t
+    s' <- find s
+    case (t', s') of
+      (Pure vt, Pure vs) -> if vt /= vs then varBind vt s' else return ()
+      (Pure vt, _)  -> if vt `Set.member` Set.fromList (vars s') then fail "occurs" else varBind vt s'
+      (_, Pure vs)  -> if vs `Set.member` Set.fromList (vars t') then fail "occurs" else varBind vs t'
+      (Impure t, Impure s)
+        | (const () <$> t) == (const () <$> s) -> zipWithM_ unifyF (toList t) (toList s)
+        | otherwise -> fail "structure mismatch"
+
+-- Specific instance for TermF, only for efficiency
 instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
+  {-# SPECIALIZE instance Unify (TermF String) VName (Term String) #-}
   unify = unifyF where
    unifyF t s = do
     t' <- find t
@@ -92,23 +110,14 @@ instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
    zipTermM_ _ _ _ = fail "Structure mismatch"
 
 
-instance (Functor f, Foldable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
-  unify = unifyF where
-   unifyF t s = do
-    t' <- find t
-    s' <- find s
-    case (t', s') of
-      (Pure vt, Pure vs) -> if vt /= vs then varBind vt s' else return ()
-      (Pure vt, _)  -> if vt `Set.member` Set.fromList (vars s') then fail "occurs" else varBind vt s'
-      (_, Pure vs)  -> if vs `Set.member` Set.fromList (vars t') then fail "occurs" else varBind vs t'
-      (Impure t, Impure s)
-        | (const () <$> t) == (const () <$> s) -> zipWithM_ unifyF (toList t) (toList s)
-        | otherwise -> fail "structure mismatch"
-
 class (Ord var, Functor termF, Monad m) => MonadEnv termF var m | m -> termF var where
     varBind :: var -> Free termF var -> m ()
     getEnv  :: m (Environment termF var)
     putEnv  :: Environment termF var -> m ()
+
+-- ------------------------------------
+-- Environments: handling substitutions
+-- ------------------------------------
 
 lookupEnv v =  (Map.lookup v . unEnv) `liftM` getEnv
 
@@ -185,13 +194,3 @@ mapM3   = mapM.mapM2
 mapM2   = mapM.mapM
 forEach = flip map
 snub    = Set.toList . Set.fromList
-
-{-
---zonk' :: (MonadEnv id var m) => Term' id var -> m (Term' id var)
-zonk' (Impure (Term id tt)) = join $ liftM (Impure . Term id) (T.mapM f tt) -- :: m (Term' id (Term' id var))
-  where f x = do
-          x' <- lookupEnv' x
-          case x' of
-            Nothing -> return (return x)
-            Just x' -> zonk x'
--}
