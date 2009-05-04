@@ -17,6 +17,7 @@ import Control.Arrow (first, second)
 import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), join, ap, (>=>))
 import Control.Monad.Free hiding (mapM)
 import Control.Monad.Free.Zip
+import Control.Monad.RWS (RWST)
 import Control.Monad.State  (State, StateT(..), MonadState(..), execStateT, evalState, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
 import qualified Data.Map as Map
@@ -65,7 +66,7 @@ run pgm query = go [query] where
         unify goal head
         go (body ++ rest)
 
-  freshInstance c = getEnv >>= \env -> evalStateT (mapM2 fresh c) (mempty `asTypeOf` env)
+  freshInstance c = getEnv >>= \env -> evalStateT (mapM2 (lift . fresh) c) (mempty `asTypeOf` env)
 
 class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
 instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
@@ -157,14 +158,18 @@ instance (Monoid w, Functor termF, MonadEnv termF var m) => MonadEnv termF var (
   varBind = (lift.) . varBind
 
 deriving instance Enum (Sum Int)
-class Monad m => MonadFresh termF var m where freshVar :: m (Free termF var)
-instance Functor termF =>  MonadFresh termF VName (EnvM termF VName) where freshVar = (var'.getSum.fst) <$> get <* modify (first succ)
---instance MonadFresh id VName (State (Sum Int)) where freshVar = (var'.getSum) <$> get <* modify succ
-instance MonadFresh termF var m => MonadFresh termF var (StateT s m) where freshVar = lift freshVar
-instance (Monoid w, MonadFresh termF var m) => MonadFresh termF var (WriterT w m) where freshVar = lift freshVar
+class Monad m => MonadFresh var m | m -> var where freshVar :: m var
+instance MonadFresh VName (EnvM termF VName) where freshVar = (Auto . getSum . fst) <$> get <* modify (first succ)
+instance MonadFresh VName (State (Sum Int))  where freshVar = modify succ >> (Auto . getSum . Prelude.pred) <$> get
+instance Monad m => MonadFresh VName (StateT (Sum Int) m)  where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
+instance (Monoid w, Monad m) => MonadFresh VName (RWST r w (Sum Int) m) where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
+
+--instance MonadState (Sum Int) m => MonadFresh VName m where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
+--instance MonadFresh var m => MonadFresh var (StateT s m) where freshVar = lift freshVar
+instance (Monoid w, MonadFresh var m) => MonadFresh var (WriterT w m) where freshVar = lift freshVar
 
 
-fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh termF var m) =>
+fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh var m) =>
          Free termF var -> m(Free termF var)
 fresh = go where
   go  = liftM join . T.mapM f
@@ -173,7 +178,7 @@ fresh = go where
           v' <- lookupEnv v `const` env
           case v' of
             Just v' -> return v'
-            Nothing -> do {v' <- freshVar; varBind v v'; return v'}
+            Nothing -> do {v' <- freshVar; varBind v (return v'); return (return v')}
 
 fmap3   = fmap.fmap.fmap
 mapM3   = mapM.mapM2
