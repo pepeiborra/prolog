@@ -67,14 +67,12 @@ list1 = brackets $ do
   terms <- commaSep1 term
   reservedOp "|"
   tail <- term
-  return $ S.term "." [foldr1 cons terms, tail]
+  return $ cons (foldr1 cons terms) tail
 
 list2 = brackets $ do
   terms <- commaSep term
   return $ foldr cons nil terms
 
-cons x y =  S.term "." [x,y]
-nil      = (S.term "[]" [])
 -- Expressions
 -- ------------
 term    = buildExpressionParser table factor

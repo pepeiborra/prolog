@@ -21,6 +21,8 @@ data GoalF id f= Pred {pred::id,args::[f]}
                | Is f f
                | Cut deriving (Eq, Show)
 data TermF id f= Term {functor::id, fargs::[f]}
+               | Cons f f
+               | Nil
                | Tuple [f]
                | Int Integer
                | Float Double
@@ -56,6 +58,12 @@ var  = return . VName
 
 var' :: (Functor f, term ~ Free f VName) => Int -> term
 var' = return . Auto
+
+cons :: (term ~ Free (TermF id) var) => term -> term -> term
+cons = (Impure.) . Cons
+
+nil :: (term ~ Free (TermF id) var) => term
+nil = Impure Nil
 
 int      = Impure . Int
 float    = Impure . Float
@@ -93,6 +101,8 @@ instance (Ppr a, Ppr id) => Ppr (TermF id a) where
     ppr (Term f []) = ppr f
     ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
     ppr (Tuple tt ) = ppr (Term "" tt)
+    ppr (Cons h t)  = brackets (ppr h <> text "|" <> ppr t)
+    ppr Nil         = brackets (Ppr.empty)
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
     ppr Wildcard    = char '_'
@@ -157,16 +167,21 @@ instance Traversable (GoalF id) where
 instance Functor (TermF id) where
     fmap     f (Term a tt) = Term a (fmap f tt)
     fmap     f (Tuple  tt) = Tuple  (fmap f tt)
+    fmap     f (Cons h t)  = Cons (f h) (f t)
+    fmap     _ Nil         = Nil
     fmap     f (Int i)     = Int i
     fmap     f (Float d)   = Float d
     fmap     f Wildcard    = Wildcard
 instance Foldable (TermF id) where
     foldMap  f (Term a tt) = foldMap f tt
     foldMap  f (Tuple  tt) = foldMap f tt
+    foldMap  f (Cons h t)  = f h `mappend` f t
     foldMap  f _           = mempty
 instance Traversable (TermF id) where
     traverse f (Term a tt) = Term a <$> traverse f tt
     traverse f (Tuple  tt) = Tuple  <$> traverse f tt
+    traverse f (Cons h t)  = Cons <$> f h <*> f t
+    traverse _ Nil         = pure Nil
     traverse f (Int i)     = pure (Int i)
     traverse f (Float i)   = pure (Float i)
     traverse f Wildcard    = pure Wildcard
