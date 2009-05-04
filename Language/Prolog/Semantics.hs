@@ -61,11 +61,11 @@ run pgm query = go [query] where
   go (Cut:rest) = go rest
   go prob@(goal:rest) = do
         mapM2 zonk prob >>= \prob' -> tell [prob']
-        h :- t <- liftList pgm >>= freshInstance
-        unify goal h
-        go (t ++ rest)
+        head :- body <- liftList pgm >>= freshInstance
+        unify goal head
+        go (body ++ rest)
 
-  freshInstance = flip evalStateT (mempty `asTypeOf` env) . mapM2 fresh
+  freshInstance c = getEnv >>= \env -> evalStateT (mapM2 fresh c) (mempty `asTypeOf` env)
 
 class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
 instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
@@ -164,7 +164,8 @@ instance MonadFresh termF var m => MonadFresh termF var (StateT s m) where fresh
 instance (Monoid w, MonadFresh termF var m) => MonadFresh termF var (WriterT w m) where freshVar = lift freshVar
 
 
-fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh termF var m) => Free termF var -> m(Free termF var)
+fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh termF var m) =>
+         Free termF var -> m(Free termF var)
 fresh = go where
   go  = liftM join . T.mapM f
   f v = do
