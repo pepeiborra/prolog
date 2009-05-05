@@ -10,14 +10,15 @@
 --   It does not support anything apart from basic Logic Programming,
 --   i.e. no Cut, no arithmetic, no E/S.
 
-module Language.Prolog.Semantics (eval, debug, unify, zonk, Environment) where
+module Language.Prolog.Semantics -- (eval, debug, unify, zonk, Environment, MonadFresh(..))
+   where
 
 import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), join, ap, (>=>))
 import Control.Monad.Free hiding (mapM)
 import Control.Monad.Free.Zip
-import Control.Monad.RWS (RWST)
+import Control.Monad.RWS (RWS, RWST)
 import Control.Monad.State  (State, StateT(..), MonadState(..), execStateT, evalState, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
 import qualified Data.Map as Map
@@ -167,11 +168,13 @@ instance (Monoid w, Functor termF, MonadEnv termF var m) => MonadEnv termF var (
   varBind = (lift.) . varBind
 
 deriving instance Enum (Sum Int)
+
 class Monad m => MonadFresh var m | m -> var where freshVar :: m var
 instance MonadFresh VName (EnvM termF VName) where freshVar = (Auto . getSum . fst) <$> get <* modify (first succ)
 instance MonadFresh VName (State (Sum Int))  where freshVar = modify succ >> (Auto . getSum . Prelude.pred) <$> get
 instance Monad m => MonadFresh VName (StateT (Sum Int) m)  where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
 instance (Monoid w, Monad m) => MonadFresh VName (RWST r w (Sum Int) m) where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
+instance Monoid w => MonadFresh VName (RWS r w (Sum Int)) where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
 
 --instance MonadState (Sum Int) m => MonadFresh VName m where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
 --instance MonadFresh var m => MonadFresh var (StateT s m) where freshVar = lift freshVar
