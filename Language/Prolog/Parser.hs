@@ -2,7 +2,7 @@ module Language.Prolog.Parser where
 
 import qualified Control.Applicative as A
 import Control.Applicative hiding ((<|>))
-import Control.Monad
+import Control.Monad.Free
 import Data.Char (isLower)
 import Text.ParserCombinators.Parsec hiding ((<|>), many, optional)
 import qualified Text.ParserCombinators.Parsec as P
@@ -51,6 +51,7 @@ simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
     atuple = S.tuple <$> parens(commaSep1 term)
 
+var :: (Functor f) => CharParser () (Free f VName)
 var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
