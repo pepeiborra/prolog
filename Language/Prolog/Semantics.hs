@@ -125,11 +125,11 @@ lookupEnv v =  (Map.lookup v . unEnv) `liftM` getEnv
 find :: MonadEnv termF var m => Free termF var -> m (Free termF var)
 find t0@(Pure v) = go v
   where
-   go v = lookupEnv v >>= \ mb_t ->
+   go x = lookupEnv x >>= \ mb_t ->
           case mb_t of
-            Just (Pure v') -> go v'
+            Just (Pure x') -> go x'
             Just t         -> varBind v t >> return t
-            Nothing        -> return t0
+            Nothing        -> return (Pure x)
 find t0 = return t0
 
 liftList :: MonadPlus m => [a] -> m a
