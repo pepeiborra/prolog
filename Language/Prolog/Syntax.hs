@@ -31,6 +31,10 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | Wildcard deriving (Eq, Ord, Show)
 
 data VName  = VName String | Auto Int deriving (Eq, Ord, Show)
+instance Enum VName where
+    fromEnum (Auto i) = i
+    fromEnum (VName _) = 0
+    toEnum = Auto
 
 type Program'' id term = [Clause'' id term]
 type Clause''  id term = ClauseF (GoalF id term)
@@ -84,6 +88,12 @@ vars :: (Functor termF, Foldable termF) => Free termF var -> [var]
 vars = toList
 
 isVar = isPure
+
+class GetVars var t | t -> var where getVars :: t -> [var]
+instance GetVars VName VName where getVars v = [v]
+instance (Functor termF, Foldable termF) => GetVars var (Free termF var) where getVars = toList
+instance (GetVars var t, Foldable f) => GetVars var (f t) where getVars = foldMap getVars
+--instance (GetVars t var, Foldable f, Foldable g) => GetVars (g(f t)) var where getVars = (foldMap.foldMap) getVars
 
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
 mapTermId f (Term id a) = Term (f id) a

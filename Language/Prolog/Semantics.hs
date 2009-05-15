@@ -39,8 +39,6 @@ newtype Environment termF var = Env {unEnv::Map var (Free termF var)}
   deriving Monoid
 liftEnv f (Env e) = Env (f e)
 
-deriving instance Ord VName
-
 instance (Ppr var, Ppr (Free termF var)) => Ppr (Environment termF var) where
     ppr = braces . hcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList . unEnv
 
@@ -48,26 +46,24 @@ restrictTo :: Ord var => [var] -> Environment id var -> Environment id var
 restrictTo vv = liftEnv f where
   f e = Map.intersectionWith const e (Map.fromDistinctAscList (zip vv (repeat undefined)))
 
-eval  :: (Ppr id, Ppr idp, Eq id, Eq idp, term ~ Term' id VName) => Program'' idp term -> GoalF idp term -> [Environment (TermF id) VName]
-eval pgm q = (fmap (restrictTo (snub $ foldMap vars q) .  zonkEnv . snd) . execEnvM' i . runWriterT . run pgm) q
+eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM termF var), GetVars var var, Traversable termF, Unify termF var term) => Program'' idp term -> GoalF idp term -> [Environment termF var]
+eval pgm q = (fmap (restrictTo (snub $ getVars q) .  zonkEnv) . execEnvM' i . runWriterT . run pgm) q
     where zonkEnv env = liftEnv (\m -> head $ evalEnvM env (mapM zonk m)) env
-          i = maximum [ i | Auto i <- foldMap vars q] + 1
+          i = maximum (map fromEnum (getVars q)) + 1
 
 debug :: (Eq idp, Ppr id, Ppr idp, Eq id, term ~ Term' id VName) => Program'' idp term -> GoalF idp term -> [ [[GoalF idp term]] ]
 debug pgm q =  ((`evalStateT` (Sum i, mempty)) . unEnvM . execWriterT . run pgm) q
   where
-    i = maximum [ i | Auto i <- foldMap vars q] + 1
+    i = maximum [ i | Auto i <- getVars q] + 1
 --run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[GoalF idp term]] m) => Program'' idp term -> Goal idp term -> m ()
 run pgm query = go [query] where
   go []         = return ()
   go (Cut:rest) = go rest
   go prob@(goal:rest) = do
         mapM2 zonk prob >>= \prob' -> tell [prob']
-        head :- body <- liftList pgm >>= freshInstance
+        head :- body <- liftList pgm >>= getFresh
         unify goal head
         go (body ++ rest)
-
-  freshInstance c = getEnv >>= \env -> evalStateT (mapM2 (lift . fresh) c) (mempty `asTypeOf` env)
 
 -- Unification
 -- -----------
@@ -147,8 +143,8 @@ newtype EnvM termF var a = EnvM {unEnvM:: (StateT (Sum Int, Environment termF va
     deriving (Functor, Monad, MonadPlus, MonadState (Sum Int, Environment termF var))
 instance Applicative (EnvM termF var) where (<*>) = ap; pure = return
 
-execEnvM = (`execStateT` mempty) . unEnvM
-execEnvM' i = (`execStateT` (Sum i, mempty)) . unEnvM
+execEnvM    = fmap snd . (`execStateT` mempty) . unEnvM
+execEnvM' i = fmap snd . (`execStateT` (Sum i, mempty)) . unEnvM
 evalEnvM  env   = (`evalStateT` (mempty,env)) . unEnvM
 evalEnvM' env i = (`evalStateT` (Sum  i,env)) . unEnvM
 
@@ -171,18 +167,13 @@ deriving instance Enum (Sum Int)
 
 class Monad m => MonadFresh var m | m -> var where freshVar :: m var
 instance MonadFresh VName (EnvM termF VName) where freshVar = (Auto . getSum . fst) <$> get <* modify (first succ)
-instance MonadFresh VName (State (Sum Int))  where freshVar = modify succ >> (Auto . getSum . Prelude.pred) <$> get
-instance Monad m => MonadFresh VName (StateT (Sum Int) m)  where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
-instance (Monoid w, Monad m) => MonadFresh VName (RWST r w (Sum Int) m) where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
-instance Monoid w => MonadFresh VName (RWS r w (Sum Int)) where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
-
---instance MonadState (Sum Int) m => MonadFresh VName m where freshVar = modify succ >> liftM (Auto . getSum . Prelude.pred) get
---instance MonadFresh var m => MonadFresh var (StateT s m) where freshVar = lift freshVar
+instance Monad m => MonadFresh v (StateT [v] m)  where freshVar = do { x:xx <- get; put xx; return x}
+instance  MonadFresh v (State [v])  where freshVar = do { x:xx <- get; put xx; return x}
+instance (Monoid w, Monad m) => MonadFresh v (RWST r w [v] m) where freshVar = do { x:xx <- get; put xx; return x}
 instance (Monoid w, MonadFresh var m) => MonadFresh var (WriterT w m) where freshVar = lift freshVar
 
-
-fresh :: forall termF var m .  (Ord var, MonadEnv termF var m, Traversable termF, MonadFresh var m) =>
-         Free termF var -> m(Free termF var)
+fresh ::  (MonadTrans t, MonadEnv termF var (t m), Traversable termF, MonadFresh var m) =>
+         Free termF var -> t  m(Free termF var)
 fresh = go where
   go  = liftM join . T.mapM f
   f v = do
@@ -190,7 +181,17 @@ fresh = go where
           v' <- lookupEnv v `const` env
           case v' of
             Just v' -> return v'
-            Nothing -> do {v' <- freshVar; varBind v (return v'); return (return v')}
+            Nothing -> do {v' <- lift freshVar; varBind v (return v'); return (return v')}
+
+class (Ord var, Traversable termF) => GetFresh (termF :: * -> *) var t | t -> termF var where
+    getFreshF :: (MonadEnv termF var (tm m), MonadFresh var m, MonadTrans tm) => t -> tm m t
+instance (Ord var, Traversable termF) => GetFresh termF var (Free termF var) where
+    getFreshF t = fresh t
+instance (Ord var, Traversable termF, GetFresh termF var t, Traversable f) => GetFresh termF var (f t) where
+    getFreshF t = mapM getFreshF t
+
+getFresh :: forall t termF var m . (GetFresh termF var t, MonadFresh var m) => t -> m t
+getFresh t = evalStateT (getFreshF t) (mempty :: Environment termF var)
 
 fmap3   = fmap.fmap.fmap
 mapM3   = mapM.mapM2
