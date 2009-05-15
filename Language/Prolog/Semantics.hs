@@ -10,7 +10,12 @@
 --   It does not support anything apart from basic Logic Programming,
 --   i.e. no Cut, no arithmetic, no E/S.
 
-module Language.Prolog.Semantics -- (eval, debug, unify, zonk, Environment, MonadFresh(..))
+module Language.Prolog.Semantics (
+        eval, debug,
+        Unify(..), unify, unifies, equiv,
+        Match(..), match, matches,
+        zonk,
+        Environment, MonadFresh(..), GetFresh(..))
    where
 
 import Control.Applicative
@@ -18,12 +23,14 @@ import Control.Arrow (first, second)
 import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), join, ap, (>=>))
 import Control.Monad.Free hiding (mapM)
 import Control.Monad.Free.Zip
+import Control.Monad.Identity (Identity)
 import Control.Monad.RWS (RWS, RWST)
 import Control.Monad.State  (State, StateT(..), MonadState(..), execStateT, evalState, evalStateT, modify, MonadTrans(..))
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Foldable (foldMap, toList, Foldable)
+import Data.Maybe(isJust)
 import Data.Monoid
 import Data.Traversable as T
 import Data.Map (Map)
@@ -36,7 +43,7 @@ import Debug.Trace
 import Language.Prolog.Syntax
 
 newtype Environment termF var = Env {unEnv::Map var (Free termF var)}
-  deriving Monoid
+  deriving (Monoid)
 liftEnv f (Env e) = Env (f e)
 
 instance (Ppr var, Ppr (Free termF var)) => Ppr (Environment termF var) where
@@ -65,26 +72,25 @@ run pgm query = go [query] where
         unify goal head
         go (body ++ rest)
 
+-- -----------
 -- Unification
 -- -----------
-class (Functor termF, Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
-instance (Unify termF var (Free termF var), Eq idp, Foldable termF) => Unify termF var (GoalF idp (Free termF var)) where
-  unify (Pred ft t) (Pred fs s) | ft /= fs = fail "Can't unify"
-  unify (Pred ft t) (Pred fs s) = zipWithM_ unify t s
+unifies :: forall termF var t . (Unify termF var t, Ord var) => t -> t -> Bool
+unifies t u = isJust (evalStateT (unify t u) (mempty :: Environment termF var))
+
+class (Traversable termF, Eq (termF ()), Eq var) => Unify termF var t | t -> termF var where unify :: MonadEnv termF var m => t -> t -> m ()
 
 -- Generic instance
-instance (Functor f, Foldable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
-  unify = unifyF where
-   unifyF t s = do
+instance (Traversable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
+  unify t s = do
     t' <- find t
     s' <- find s
-    case (t', s') of
-      (Pure vt, Pure vs) -> if vt /= vs then varBind vt s' else return ()
-      (Pure vt, _)  -> if vt `Set.member` Set.fromList (vars s') then fail "occurs" else varBind vt s'
-      (_, Pure vs)  -> if vs `Set.member` Set.fromList (vars t') then fail "occurs" else varBind vs t'
-      (Impure t, Impure s)
-        | (const () <$> t) == (const () <$> s) -> zipWithM_ unifyF (toList t) (toList s)
-        | otherwise -> fail "structure mismatch"
+    unifyOne t' s'
+   where
+     unifyOne (Pure vt) s@(Pure vs) = if vt /= vs then varBind vt s else return ()
+     unifyOne (Pure vt) s           = if vt `Set.member` Set.fromList (vars s) then fail "occurs" else varBind vt s
+     unifyOne t           (Pure vs) = if vs `Set.member` Set.fromList (vars t) then fail "occurs" else varBind vs t
+     unifyOne t         s           = zipFree_ unify t s
 
 -- Specific instance for TermF, only for efficiency
 instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
@@ -107,14 +113,61 @@ instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
    zipTermM_ _ _ _ = fail "Structure mismatch"
 
 
-class (Ord var, Functor termF, Monad m) => MonadEnv termF var m | m -> termF var where
-    varBind :: var -> Free termF var -> m ()
-    getEnv  :: m (Environment termF var)
-    putEnv  :: Environment termF var -> m ()
+instance (Unify termF var t, Foldable f) => Unify termF var (f t) where
+  unify t u = zipWithM_ unify (toList t) (toList u)
+
+-- ---------
+-- Matching
+-- ---------
+matches :: forall termF var t. (Match termF var t, Ord var) => t -> t -> Bool
+matches t u = isJust (evalStateT (match t u) (mempty :: Environment termF var))
+
+class (Eq (termF ()), Traversable termF) => Match termF var t | t -> termF var where match :: MonadEnv termF var m => t -> t -> m ()
+instance (Traversable termF, Eq (termF ())) =>  Match termF var (Free termF var) where
+  match t s = do
+    t' <- find t
+    s' <- find s
+    matchOne t' s'
+    where matchOne (Pure v) u = varBind v u
+          matchOne t        u = zipFree_ match t u
+
+instance (Match termF var t, Foldable f) => Match termF var (f t) where
+  match t u = zipWithM_ match (toList t) (toList u)
+
+-- --------------------------
+-- Equivalence up to renaming
+-- --------------------------
+
+equiv ::  (Ord var, Enum var, Ord (termF (Free termF var)),
+           MonadFresh var (EnvM termF var), Unify termF var t, GetVars var t, GetFresh termF var t) => t -> t -> Bool
+equiv t u = case execEnvM' i (unify t =<< getFresh u) of
+              [x] -> isRenaming x
+              _   -> False
+ where
+     i = maximum (map fromEnum (getVars t)) + 1
+--    isRenaming :: (Functor termF, Ord var, Ord (termF (Free termF var))) => Environment termF var -> Bool
+     isRenaming (unEnv -> subst) = all isVar (Map.elems subst) && isBijective (Map.mapKeysMonotonic return  subst)
+
+--    isBijective :: Ord k => Map.Map k k -> Bool
+     isBijective rel = -- cheap hackish bijectivity check.
+                    -- Ensure that the relation is injective and its inverse is too.
+                    -- The sets of variables must be disjoint too
+                    -- Actually there should be no need to check the inverse
+                    -- since this is a Haskell Map and hence the domain contains no duplicates
+                   Set.size elemsSet == Map.size rel &&
+                   (Map.keysSet rel) `Set.intersection` elemsSet == Set.empty
+       where
+          elemsSet = Set.fromList(Map.elems rel)
+
 
 -- ------------------------------------
 -- Environments: handling substitutions
 -- ------------------------------------
+
+class (Ord var, Functor termF, Monad m) => MonadEnv termF var m | m -> termF var where
+    varBind :: var -> Free termF var -> m ()
+    getEnv  :: m (Environment termF var)
+    putEnv  :: Environment termF var -> m ()
 
 lookupEnv v =  (Map.lookup v . unEnv) `liftM` getEnv
 
