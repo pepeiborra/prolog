@@ -83,6 +83,8 @@ termFunctor = foldFree (const mzero) f where
 vars :: (Functor termF, Foldable termF) => Free termF var -> [var]
 vars = toList
 
+isVar = isPure
+
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
 mapTermId f (Term id a) = Term (f id) a
 mapTermId _ (Tuple tt)  = Tuple tt
