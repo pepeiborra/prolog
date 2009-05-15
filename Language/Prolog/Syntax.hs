@@ -15,11 +15,12 @@ import Data.Traversable as T
 
 import Text.PrettyPrint as Ppr
 
-data ClauseF f = f :- [f] deriving (Eq, Show)
+data ClauseF f = f :- [f] deriving (Eq, Ord, Show)
 data GoalF id f= Pred {pred::id,args::[f]}
                | f :=: f
                | Is f f
-               | Cut deriving (Eq, Show)
+               | Cut
+   deriving (Eq, Ord, Show)
 data TermF id f= Term {functor::id, fargs::[f]}
                | Cons f f
                | Nil
@@ -27,9 +28,9 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | Int Integer
                | Float Double
                | String String
-               | Wildcard deriving (Eq, Show)
+               | Wildcard deriving (Eq, Ord, Show)
 
-data VName  = VName String | Auto Int deriving (Eq, Show)
+data VName  = VName String | Auto Int deriving (Eq, Ord, Show)
 
 type Program'' id term = [Clause'' id term]
 type Clause''  id term = ClauseF (GoalF id term)
