@@ -130,9 +130,12 @@ instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map 
 
 --instance Ppr Char where ppr = char
 instance Ppr String where ppr = text
+instance Ppr Int    where ppr = Ppr.int
 instance Ppr a => Ppr [a]     where ppr = brackets . hcat . punctuate comma . map ppr
 instance (Ppr a, Ppr b) => Ppr (a,b) where ppr (a,b) = parens (ppr a <> comma <> ppr b)
 instance (Ppr a, Ppr b, Ppr c) => Ppr (a,b,c) where ppr (a,b,c) = parens (ppr a <> comma <> ppr b <> comma <> ppr c)
+instance (Ppr a, Ppr b, Ppr c, Ppr d) => Ppr (a,b,c,d) where
+    ppr (a,b,c,d) = parens (fsep $ punctuate comma [ppr a, ppr b, ppr c, ppr d])
 
 --instance Ppr String where ppr = text
 
