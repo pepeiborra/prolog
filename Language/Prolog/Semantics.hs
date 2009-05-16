@@ -160,7 +160,8 @@ equiv t u = case execEnvM' i (unify t =<< getFresh u) of
                    (Map.keysSet rel) `Set.intersection` elemsSet == Set.empty
        where
           elemsSet = Set.fromList(Map.elems rel)
-
+equiv2 :: (Ord var, Match termF var t) => t -> t -> Bool
+equiv2 t u = t `matches`u && u `matches` t
 
 -- ------------------------------------
 -- Environments: handling substitutions
