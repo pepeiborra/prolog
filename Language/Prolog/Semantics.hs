@@ -88,8 +88,8 @@ instance (Traversable f, Eq var, Eq (f ())) => Unify f var (Free f var) where
     unifyOne t' s'
    where
      unifyOne (Pure vt) s@(Pure vs) = if vt /= vs then varBind vt s else return ()
-     unifyOne (Pure vt) s           = if vt `Set.member` Set.fromList (vars s) then fail "occurs" else varBind vt s
-     unifyOne t           (Pure vs) = if vs `Set.member` Set.fromList (vars t) then fail "occurs" else varBind vs t
+     unifyOne (Pure vt) s           = {- if vt `Set.member` Set.fromList (vars s) then fail "occurs" else-} varBind vt s
+     unifyOne t           (Pure vs) = {-if vs `Set.member` Set.fromList (vars t) then fail "occurs" else-} varBind vs t
      unifyOne t         s           = zipFree_ unify t s
 
 -- Specific instance for TermF, only for efficiency
@@ -101,8 +101,8 @@ instance (Eq var, Eq id) => Unify (TermF id) var (Term' id var) where
     s' <- find s
     case (t', s') of
       (Pure vt, Pure vs) -> if vt /= vs then varBind vt s' else return ()
-      (Pure vt, _)  -> if vt `Set.member` Set.fromList (vars s') then fail "occurs" else varBind vt s'
-      (_, Pure vs)  -> if vs `Set.member` Set.fromList (vars t') then fail "occurs" else varBind vs t'
+      (Pure vt, _)  -> {-if vt `Set.member` Set.fromList (vars s') then fail "occurs" else-} varBind vt s'
+      (_, Pure vs)  -> {-if vs `Set.member` Set.fromList (vars t') then fail "occurs" else-} varBind vs t'
       (Impure t, Impure s) -> zipTermM_ unifyF t s
    zipTermM_ f (Term f1 tt1) (Term f2 tt2) | f1 == f2 = zipWithM_ f tt1 tt2
    zipTermM_ f (Tuple tt1)   (Tuple tt2) = zipWithM_ f tt1 tt2
