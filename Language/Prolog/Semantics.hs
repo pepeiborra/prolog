@@ -56,12 +56,12 @@ restrictTo vv = liftEnv f where
 eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM termF var), GetVars var var, Traversable termF, Unify termF var term) => Program'' idp term -> GoalF idp term -> [Environment termF var]
 eval pgm q = (fmap (restrictTo (snub $ getVars q) .  zonkEnv) . execEnvM' i . runWriterT . run pgm) q
     where zonkEnv env = liftEnv (\m -> head $ evalEnvM env (mapM zonk m)) env
-          i = maximum (map fromEnum (getVars q)) + 1
+          i = maximum (0 : map fromEnum (getVars q)) + 1
 
 debug :: (Eq idp, Ppr id, Ppr idp, Eq id, term ~ Term' id VName) => Program'' idp term -> GoalF idp term -> [ [[GoalF idp term]] ]
 debug pgm q =  ((`evalStateT` (Sum i, mempty)) . unEnvM . execWriterT . run pgm) q
   where
-    i = maximum [ i | Auto i <- getVars q] + 1
+    i = maximum (0 : map fromEnum (getVars q)) + 1
 --run :: (Eq id, Ppr id, Ppr idp, Eq idp, term ~ Term' id var, var ~ VName, MonadPlus m, MonadFresh id var m, MonadEnv id var m, MonadWriter [[GoalF idp term]] m) => Program'' idp term -> Goal idp term -> m ()
 run pgm query = go [query] where
   go []         = return ()
@@ -144,7 +144,7 @@ equiv t u = case execEnvM' i (unify t =<< getFresh u) of
               [x] -> isRenaming x
               _   -> False
  where
-     i = maximum (map fromEnum (getVars t)) + 1
+     i = maximum (0 : map fromEnum (getVars t)) + 1
 --    isRenaming :: (Functor termF, Ord var, Ord (termF (Free termF var))) => Environment termF var -> Bool
      isRenaming (unEnv -> subst) = all isVar (Map.elems subst) && isBijective (Map.mapKeysMonotonic return  subst)
 
