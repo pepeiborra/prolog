@@ -124,11 +124,13 @@ matches t u = isJust (evalStateT (match t u) (mempty :: Environment termF var))
 
 class (Eq (termF ()), Traversable termF) => Match termF var t | t -> termF var where match :: MonadEnv termF var m => t -> t -> m ()
 instance (Traversable termF, Eq (termF ())) =>  Match termF var (Free termF var) where
+  {-# SPECIALIZE instance Match (TermF String) VName (Term String) #-}
   match t s = do
     t' <- find t
     s' <- find s
     matchOne t' s'
-    where matchOne (Pure v) u = varBind v u
+    where matchOne (Pure v) (Pure u) | v == u = return ()
+          matchOne (Pure v) u = varBind v u
           matchOne t        u = zipFree_ match t u
 
 instance (Match termF var t, Foldable f) => Match termF var (f t) where
