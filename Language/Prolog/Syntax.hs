@@ -12,6 +12,7 @@ import Control.Applicative
 import Control.Monad.Free
 import Data.Foldable
 import Data.Monoid
+import qualified Data.Set as Set
 import Data.Traversable as T
 
 import Text.PrettyPrint as Ppr
@@ -90,10 +91,10 @@ vars = toList
 
 isVar = isPure
 
-class GetVars var t | t -> var where getVars :: t -> [var]
+class Ord var => GetVars var t | t -> var where getVars :: t -> [var]
 instance GetVars VName VName where getVars v = [v]
-instance (Functor termF, Foldable termF) => GetVars var (Free termF var) where getVars = toList
-instance (GetVars var t, Foldable f) => GetVars var (f t) where getVars = foldMap getVars
+instance (Functor termF, Foldable termF, Ord var) => GetVars var (Free termF var) where getVars = snub . toList
+instance (GetVars var t, Foldable f) => GetVars var (f t) where getVars = snub . foldMap getVars
 --instance (GetVars t var, Foldable f, Foldable g) => GetVars (g(f t)) var where getVars = (foldMap.foldMap) getVars
 
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
@@ -203,3 +204,7 @@ instance Traversable (TermF id) where
     traverse f (Float i)   = pure (Float i)
     traverse f Wildcard    = pure Wildcard
 
+-- Other
+-- -----
+snub :: Ord a => [a] -> [a]
+snub = Set.toList . Set.fromList
