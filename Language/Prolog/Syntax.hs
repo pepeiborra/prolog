@@ -6,7 +6,18 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
-module Language.Prolog.Syntax where
+module Language.Prolog.Syntax (
+     ClauseF(..), GoalF(..), TermF(..), VName(..),
+     Program, Clause, Goal, Term,
+     Program', Clause', Goal', Term',
+     Program'', Clause'',
+     ident, term, tuple, var, var',
+     cons, nil, int, float, string, wildcard,
+     subterms, termFunctor,
+     isVar, vars, GetVars(..),
+     mapTermId, mapPredId,
+     Ppr(..)
+     ) where
 
 import Control.Applicative
 import Control.Monad.Free
@@ -15,7 +26,8 @@ import Data.Monoid
 import qualified Data.Set as Set
 import Data.Traversable as T
 
-import Text.PrettyPrint as Ppr
+import Text.PrettyPrint hiding (int, float)
+import qualified Text.PrettyPrint as Ppr
 
 data ClauseF f = f :- [f] deriving (Eq, Ord, Show)
 data GoalF id f= Pred {pred::id,args::[f]}
