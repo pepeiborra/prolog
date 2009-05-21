@@ -9,9 +9,16 @@ description:
 category: Language
 author: Pepe Iborra
 
+Flag transformers
+   default: False
+
 Library
   buildable: True
-  build-depends: base, parsec, pretty, containers, transformers, monads-fd, control-monad-free >= 0.4 
+  build-depends: base, parsec, pretty, containers, control-monad-free >= 0.4 
+  if flag(transformers)
+     build-depends: transformers, monads-fd
+  else
+     build-depends: mtl
   exposed-modules:
      Language.Prolog.Parser
      Language.Prolog.Syntax
