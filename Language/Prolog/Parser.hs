@@ -20,7 +20,7 @@ infixr 0 <|>
 (<|>) :: Alternative f => f a -> f a -> f a
 (<|>) = (A.<|>)
 
-program  :: CharParser () [Clause String]
+program  :: GenParser Char st [Clause String]
 program   = whiteSpace *> many1 clause <* eof
 
 clause    = ((:-) <$> goal <*> (reservedOp ":-" *> commaSep1 goal <|> return [])) <* dot
@@ -51,7 +51,7 @@ simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
     atuple = S.tuple <$> parens(commaSep1 term)
 
-var :: (Functor f) => CharParser () (Free f VName)
+var :: (Functor f) => GenParser Char st (Free f VName)
 var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
@@ -110,7 +110,7 @@ float     = P.float lexer
 stringLiteral = P.stringLiteral lexer
 operator  = P.operator lexer
 
-lexer :: P.TokenParser ()
+lexer :: P.TokenParser st
 lexer  = P.makeTokenParser prologDef
 
 prologStyle :: LanguageDef st
