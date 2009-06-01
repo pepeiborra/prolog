@@ -34,6 +34,7 @@ import Data.Maybe(isJust)
 import Data.Monoid
 import Data.Traversable as T
 import Data.Map (Map)
+import Data.Term.Rules
 import Data.Term.Var
 import Data.Term.IOVar
 import Data.Term hiding (unify)
@@ -94,18 +95,6 @@ instance (Ppr term, Ppr idp) => Ppr (Trace idp term) where
   ppr(Call g h) = text "Call" <+> ppr g <+> ppr h
   ppr(Exit g) = text "Exit" <+> ppr g
   ppr(Fail g) = text "Fail" <+> ppr g
-
--- -----------
--- Unification
--- -----------
-class (Traversable termF, Eq (termF ()), Eq var) => GetUnifier termF var t | t -> termF var
-    where getUnifier :: MonadEnv termF var m => t -> t -> m ()
-
-instance (Traversable f, Eq var, Eq (f ())) => GetUnifier f var (Free f var) where
-  getUnifier t u = Term.unify t u
-instance (GetUnifier termF var t, Eq (f ()), Functor f, Foldable f) => GetUnifier termF var (f t) where
-  getUnifier t u | fmap (const ()) t == fmap (const ()) u = zipWithM_ getUnifier (toList t) (toList u)
-            | otherwise = fail "structure mismatch"
 -- -----------------
 -- Environment Monad
 -- -----------------
@@ -131,20 +120,6 @@ execEnvM' i = fmap snd . observeAll . (`execStateT` (Sum i, mempty)) . unEnvM
 evalEnvM  env   = observeAll . (`evalStateT` (mempty,env)) . unEnvM
 evalEnvM' i = observeAll . (`evalStateT` (Sum  i,mempty)) . unEnvM
 runEnvM'  i = fmap (second snd) . observeAll . (`runStateT` (Sum  i,mempty)) . unEnvM
-
--- ------------------------------------------
--- GetFresh: Variants of terms and clauses
--- ------------------------------------------
-
-class (Traversable termF) => GetFresh (termF :: * -> *) var thing | thing -> termF var where
-    getFresh' :: (MonadTrans t, MonadFresh var m, MonadEnv termF var (t m)) => thing -> t m thing
-instance (Traversable termF) => GetFresh termF var (Free termF var) where
-    getFresh' t = fresh t
-instance (Traversable termF, GetFresh termF var t, Traversable f) => GetFresh termF var (f t) where
-    getFresh' t = mapM getFresh' t
-
-getFresh :: forall t v m thing. (Ord v, MonadFresh v m, GetFresh t v thing) => thing -> m thing
-getFresh t = evalStateT (getFresh' t) (mempty :: Substitution t v)
 
 -- -------------------
 -- Liftings for LogicT

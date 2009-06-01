@@ -13,7 +13,6 @@ module Language.Prolog.Syntax (
      Program'', Clause'',
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
-     GetVars(..),
      mapTermId, mapPredId,
      Ppr(..)
      ) where
@@ -77,12 +76,6 @@ int      = Impure . Int
 float    = Impure . Float
 string   = Impure . String
 wildcard = Impure Wildcard
-
-class Ord var => GetVars var t | t -> var where getVars :: t -> [var]
-instance GetVars Var Var where getVars v = [v]
-instance (Functor termF, Foldable termF, Ord var) => GetVars var (Free termF var) where getVars = snub . toList
-instance (GetVars var t, Foldable f) => GetVars var (f t) where getVars = snub . foldMap getVars
---instance (GetVars t var, Foldable f, Foldable g) => GetVars (g(f t)) var where getVars = (foldMap.foldMap) getVars
 
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
 mapTermId f (Term id a) = Term (f id) a
