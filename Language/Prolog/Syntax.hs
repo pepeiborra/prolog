@@ -92,6 +92,16 @@ mapPredId _ Cut          = Cut
 
 class Ppr a where ppr :: a -> Doc
 
+instance (Ppr id, Ppr a) => Ppr (TermF id a) where
+    ppr (Term f []) = ppr f
+    ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
+    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
+    ppr (Cons h t)  = brackets (ppr h <> text "|" <> ppr t)
+    ppr Nil         = brackets (Ppr.empty)
+    ppr (Int i)     = Ppr.integer i
+    ppr (Float i)   = double i
+    ppr Wildcard    = char '_'
+
 --instance (Ppr a, Ppr id) => Ppr (TermF id a) where
 instance (Ppr id, Ppr v) => Ppr (TermF id (Free (TermF id) v)) where
     ppr (Term f []) = ppr f
