@@ -51,15 +51,7 @@ eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM
 eval pgm q = (fmap (restrictTo vq .  zonkSubst . snd) . filter (fst.fst) . runEnvM' i . runWriterT . run pgm) q
     where i    = maximum (0 : map fromEnum vq) + 1
           vq = snub(getVars q)
-{-
-evalIO  :: (Eq (t ()), Eq (Free t (IOVar t)),  Eq idp, Ord var, Traversable t, term0 ~ Free t var) =>
-         Program'' idp term0 -> GoalF idp term0 -> IO [Substitution t var]
-evalIO pgm q = observeAllT $ do
-  (q',env) <- runStateT (mapM  instantiate   q) mempty
-  res <- (liftM fst . runWriterT) (run pgm q')
-  guard res
-  lift$ getInst env
--}
+
 debug :: (Eq id, Eq idp, term ~ Term' id Var) => Program'' idp term -> GoalF idp term -> [[Trace idp term]]
 debug pgm q =  (evalEnvM' i . execWriterT . run pgm) q
   where
