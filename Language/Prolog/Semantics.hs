@@ -50,6 +50,15 @@ eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM
 eval pgm q = (fmap (restrictTo vq .  zonkSubst . snd) . filter (fst.fst) . runEnvM' i . runWriterT . run pgm) q
     where i    = maximum (0 : map fromEnum vq) + 1
           vq = snub(getVars q)
+{-
+evalIO  :: (Eq (t ()), Eq (Free t (IOVar t)),  Eq idp, Ord var, Traversable t, term0 ~ Free t var) =>
+         Program'' idp term0 -> GoalF idp term0 -> IO [Substitution t var]
+evalIO pgm q = observeAllT $ do
+  (q',env) <- runStateT (mapM  instantiate   q) mempty
+  res <- (liftM fst . runWriterT) (run pgm q')
+  guard res
+  lift$ getInst env
+-}
 debug :: (Eq id, Eq idp, term ~ Term' id Var) => Program'' idp term -> GoalF idp term -> [[Trace idp term]]
 debug pgm q =  (evalEnvM' i . execWriterT . run pgm) q
   where
@@ -111,16 +120,6 @@ instance (Traversable termF, Ord var) => MonadEnv termF var (EnvM termF var) whe
   varBind v t = do {(l,s) <- get; put (l, liftSubst (Map.insert v t) s)}
   lookupVar v = get >>= \(_,s) -> return (lookupSubst v s)
 
-instance MonadEnv t v m => MonadEnv t v (ListT m) where
-  varBind   = (lift.) . varBind
-  lookupVar = lift    . lookupVar
-
-instance (Monoid w, Functor termF, MonadEnv termF var m) => MonadEnv termF var (WriterT w m) where
-  varBind = (lift.) . varBind
-  lookupVar = lift . lookupVar
-instance (Functor termF, MonadEnv termF var m) => MonadEnv termF var (LogicT m) where
-  varBind = (lift.) . varBind
-  lookupVar = lift . lookupVar
 
 {-
 instance (Functor termF, MonadEnv termF var m) => MonadEnv termF var (StateT s m) where
@@ -147,10 +146,14 @@ instance (Traversable termF, GetFresh termF var t, Traversable f) => GetFresh te
 getFresh :: forall t v m thing. (Ord v, MonadFresh v m, GetFresh t v thing) => thing -> m thing
 getFresh t = evalStateT (getFresh' t) (mempty :: Substitution t v)
 
-instance (Monoid w, MonadFresh var m) => MonadFresh var (WriterT w m) where freshVar = lift freshVar
-instance MonadFresh var m => MonadFresh var (ListT    m) where freshVar = lift freshVar
-instance MonadFresh var m => MonadFresh var (StateT s m) where freshVar = lift freshVar
+-- -------------------
+-- Liftings for LogicT
+-- -------------------
+instance (Functor termF, MonadEnv termF var m) => MonadEnv termF var (LogicT m) where
+  varBind = (lift.) . varBind
+  lookupVar = lift . lookupVar
 instance MonadFresh var m => MonadFresh var (LogicT   m) where freshVar = lift freshVar
+
 
 -- -----------
 -- Combinators
