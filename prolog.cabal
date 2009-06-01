@@ -23,3 +23,9 @@ Library
      Language.Prolog.Parser
      Language.Prolog.Syntax
      Language.Prolog.Semantics
+
+Executable hProlog
+  buildable: True
+  build-depends: haskeline, logict
+  main-is: Language/Prolog/REPL.hs
+  ghc-options: -main-is Language.Prolog.REPL.main
