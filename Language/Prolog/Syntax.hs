@@ -7,14 +7,13 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Language.Prolog.Syntax (
-     ClauseF(..), GoalF(..), TermF(..), VName(..),
+     ClauseF(..), GoalF(..), TermF(..),
      Program, Clause, Goal, Term,
      Program', Clause', Goal', Term',
      Program'', Clause'',
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
-     subterms, termFunctor,
-     isVar, vars, GetVars(..),
+     GetVars(..),
      mapTermId, mapPredId,
      Ppr(..)
      ) where
@@ -24,6 +23,8 @@ import Control.Monad.Free
 import Data.Foldable
 import Data.Monoid
 import qualified Data.Set as Set
+import Data.Term hiding (Term)
+import Data.Term.Var
 import Data.Traversable as T
 
 import Text.PrettyPrint hiding (int, float)
@@ -44,12 +45,6 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | String String
                | Wildcard deriving (Eq, Ord, Show)
 
-data VName  = VName String | Auto Int deriving (Eq, Ord, Show)
-instance Enum VName where
-    fromEnum (Auto i) = i
-    fromEnum (VName _) = 0
-    toEnum = Auto
-
 type Program'' id term = [Clause'' id term]
 type Clause''  id term = ClauseF (GoalF id term)
 
@@ -61,7 +56,7 @@ type Term'    id var = Free (TermF id) var
 type Program id = [Clause id]
 type Clause  id = ClauseF (Goal id)
 type Goal    id = GoalF id (Term id)
-type Term    id = Term' id VName
+type Term    id = Term' id Var
 
 ident :: id -> Term' id a
 ident f = term f []
@@ -71,12 +66,6 @@ term f = Impure . Term f
 
 tuple :: [Term' id a] -> Term' id a
 tuple = Impure . Tuple
-
-var :: (Functor f, term ~ Free f VName) =>  String -> term
-var  = return . VName
-
-var' :: (Functor f, term ~ Free f VName) => Int -> term
-var' = return . Auto
 
 cons :: (term ~ Free (TermF id) var) => term -> term -> term
 cons = (Impure.) . Cons
@@ -89,22 +78,8 @@ float    = Impure . Float
 string   = Impure . String
 wildcard = Impure Wildcard
 
-subterms :: (term ~ Free termF var, Foldable termF) => term -> [term]
-subterms (Impure t) = Impure t : Prelude.concat (subterms <$> toList t)
-subterms _ = []
-
-termFunctor :: MonadPlus m => Term' id a -> m id
-termFunctor = foldFree (const mzero) f where
-    f (Term f tt) = return f `mplus` Data.Foldable.msum tt
-    f _ = mzero
-
-vars :: (Functor termF, Foldable termF) => Free termF var -> [var]
-vars = toList
-
-isVar = isPure
-
 class Ord var => GetVars var t | t -> var where getVars :: t -> [var]
-instance GetVars VName VName where getVars v = [v]
+instance GetVars Var Var where getVars v = [v]
 instance (Functor termF, Foldable termF, Ord var) => GetVars var (Free termF var) where getVars = snub . toList
 instance (GetVars var t, Foldable f) => GetVars var (f t) where getVars = snub . foldMap getVars
 --instance (GetVars t var, Foldable f, Foldable g) => GetVars (g(f t)) var where getVars = (foldMap.foldMap) getVars
@@ -124,19 +99,25 @@ mapPredId _ Cut          = Cut
 
 class Ppr a where ppr :: a -> Doc
 
-instance (Ppr a, Ppr id) => Ppr (TermF id a) where
+--instance (Ppr a, Ppr id) => Ppr (TermF id a) where
+instance (Ppr id, Ppr v) => Ppr (TermF id (Free (TermF id) v)) where
     ppr (Term f []) = ppr f
     ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Tuple tt ) = ppr (Term "" tt)
-    ppr (Cons h t)  = brackets (ppr h <> text "|" <> ppr t)
+    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
+    ppr (Cons h t)
+        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map ppr (h:elems))
+        | otherwise   = brackets (ppr h <> text "|" <> ppr t)
+      where getElems (Impure Nil) = Just []
+            getElems (Impure (Cons a b)) = (a :) `fmap` getElems b
+            getElems _ = Nothing
     ppr Nil         = brackets (Ppr.empty)
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
     ppr Wildcard    = char '_'
 
-instance Ppr VName where
+instance Ppr Var where
     ppr (VName v)  = text v
-    ppr (Auto v_i) = text "V" <> Ppr.int v_i
+    ppr (VAuto v_i) = text "V" <> Ppr.int v_i
 
 instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
     ppr (Pred f []) = ppr f
@@ -155,6 +136,9 @@ instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map 
 --instance Ppr Char where ppr = char
 instance Ppr String where ppr = text
 instance Ppr Int    where ppr = Ppr.int
+instance Ppr a => Ppr (Maybe a) where
+    ppr Nothing  = text "Nothing"
+    ppr (Just a) = text "Just" <+> ppr a
 instance Ppr a => Ppr [a]     where ppr = brackets . hcat . punctuate comma . map ppr
 instance (Ppr a, Ppr b) => Ppr (a,b) where ppr (a,b) = parens (ppr a <> comma <> ppr b)
 instance (Ppr a, Ppr b, Ppr c) => Ppr (a,b,c) where ppr (a,b,c) = parens (ppr a <> comma <> ppr b <> comma <> ppr c)

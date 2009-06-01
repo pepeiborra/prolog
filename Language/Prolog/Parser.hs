@@ -4,6 +4,7 @@ import qualified Control.Applicative as A
 import Control.Applicative hiding ((<|>))
 import Control.Monad.Free
 import Data.Char (isLower)
+import Data.Term.Var (Var)
 import Text.ParserCombinators.Parsec hiding ((<|>), many, optional)
 import qualified Text.ParserCombinators.Parsec as P
 import qualified Text.ParserCombinators.Parsec.Token as P
@@ -51,7 +52,7 @@ simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
     atuple = S.tuple <$> parens(commaSep1 term)
 
-var :: (Functor f) => GenParser Char st (Free f VName)
+var :: (Functor f) => GenParser Char st (Free f Var)
 var       = lexeme$ do
   first <- upper
   rest  <- many (alphaNum <|> char '_')
