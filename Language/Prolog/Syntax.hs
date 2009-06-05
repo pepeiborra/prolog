@@ -23,6 +23,7 @@ import Data.Foldable
 import Data.Monoid
 import qualified Data.Set as Set
 import Data.Term hiding (Term)
+import Data.Term.Rules
 import Data.Term.Var
 import Data.Traversable as T
 
@@ -202,6 +203,17 @@ instance Traversable (TermF id) where
     traverse f (Int i)     = pure (Int i)
     traverse f (Float i)   = pure (Float i)
     traverse f Wildcard    = pure Wildcard
+
+-- Term Boilerplate
+-- ----------------
+instance (Eq id, GetMatcher t v a) => GetMatcher t v (GoalF id a) where getMatcherM = getMatcherMdefault
+instance (Eq id, GetUnifier t v a) => GetUnifier t v (GoalF id a) where getUnifierM = getUnifierMdefault
+instance         GetFresh t v a    => GetFresh   t v (GoalF id a) where getFreshM   = getFreshMdefault
+
+instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getMatcherMdefault
+instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
+instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
+
 
 -- Other
 -- -----

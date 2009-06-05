@@ -69,7 +69,7 @@ run pgm query = go [query] where
         head :- body <- liftList pgm >>= \c -> evalStateT (mapM2 fresh' c) (mempty :: Substitution termF (Either var0 var))
         zg <- mapM (zonkM return) goal
         tell [Call zg head]
-        ifte (getUnifier goal head)
+        ifte (getUnifierM goal head)
              (\_ -> do
                  mapM (zonkM return) zg >>= \zg' -> tell [Exit zg']
                  go (body ++ rest))
