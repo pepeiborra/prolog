@@ -19,8 +19,9 @@ module Language.Prolog.Syntax (
 
 import Control.Applicative
 import Control.Monad.Free
-import Data.Foldable
+import Data.Foldable as F
 import Data.Monoid
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Term hiding (Term)
 import Data.Term.Rules
@@ -186,6 +187,13 @@ instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getM
 instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
 instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
 
+
+instance (Show id, Ord id) => HasSignature (Program' id var) id where
+  getSignature cc = let aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
+                        aritiesF = Map.fromList [ (f, length tt) | Pred _ args <- F.toList =<< cc, Impure(Term f tt) <- subterms =<< args ]
+                        functors = Map.keysSet aritiesF
+                        preds    = Map.keysSet aritiesP
+                        in Sig {constructorSymbols = functors, definedSymbols = preds, arity = aritiesP `mappend` aritiesF}
 
 -- Other
 -- -----
