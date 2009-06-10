@@ -25,6 +25,7 @@ import qualified Data.Set as Set
 import Data.Term hiding (Term)
 import Data.Term.Rules
 import Data.Term.Var
+import Data.Term.Ppr
 import Data.Traversable as T
 
 import Text.PrettyPrint hiding (int, float)
@@ -91,7 +92,6 @@ mapPredId _ (Is t1 t2)   = Is t1 t2
 mapPredId _ (t1 :=: t2)  = t1 :=: t2
 mapPredId _ Cut          = Cut
 
-class Ppr a where ppr :: a -> Doc
 
 instance (Ppr id, Ppr a) => Ppr (TermF id a) where
     ppr (Term f []) = ppr f
@@ -119,10 +119,6 @@ instance (Ppr id, Ppr v) => Ppr (TermF id (Free (TermF id) v)) where
     ppr (Float i)   = double i
     ppr Wildcard    = char '_'
 
-instance Ppr Var where
-    ppr (VName v)  = text v
-    ppr (VAuto v_i) = text "V" <> Ppr.int v_i
-
 instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
     ppr (Pred f []) = ppr f
     ppr (Pred f tt) = ppr f <> parens(hcat (punctuate comma $ map ppr tt))
@@ -130,35 +126,11 @@ instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
     ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
     ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
 
-instance (Ppr (f(Free f a)), Ppr a) => Ppr (Free f a) where ppr (Impure t) = ppr t; ppr (Pure a) = ppr a
 instance Ppr a => Ppr (ClauseF a)  where
     ppr (h :- []) = ppr h <> char '.'
     ppr (h :- t) = ppr h <+> text ":-" <+> hcat(punctuate comma (map ppr t)) <> char '.'
 
 instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
-
---instance Ppr Char where ppr = char
-instance Ppr String where ppr = text
-instance Ppr Int    where ppr = Ppr.int
-instance Ppr a => Ppr (Maybe a) where
-    ppr Nothing  = text "Nothing"
-    ppr (Just a) = text "Just" <+> ppr a
-instance Ppr a => Ppr [a]     where ppr = brackets . hcat . punctuate comma . map ppr
-instance (Ppr a, Ppr b) => Ppr (a,b) where ppr (a,b) = parens (ppr a <> comma <> ppr b)
-instance (Ppr a, Ppr b, Ppr c) => Ppr (a,b,c) where ppr (a,b,c) = parens (ppr a <> comma <> ppr b <> comma <> ppr c)
-instance (Ppr a, Ppr b, Ppr c, Ppr d) => Ppr (a,b,c,d) where
-    ppr (a,b,c,d) = parens (fsep $ punctuate comma [ppr a, ppr b, ppr c, ppr d])
-
---instance Ppr String where ppr = text
-
-{-
-instance Show Program where show = render . ppr
-instance Show Clause  where show = render . ppr
-instance Show Goal    where show = render . ppr
-instance Show Term    where show = render . ppr
-instance Show VName   where show = render . ppr
--}
-
 
 -- Functor boilerplate
 -- --------------------
