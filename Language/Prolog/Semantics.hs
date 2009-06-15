@@ -75,9 +75,6 @@ run pgm query = go [query] where
                  go (body ++ rest))
              (tell [Fail zg] >> return False)
 
-instance (Ppr var, Ppr (Free termF var)) => Ppr (Substitution termF var) where
-    ppr = braces . hcat . punctuate comma . map (\(v,t) -> ppr v <+> equals <+> ppr t) . Map.toList . unSubst
-
 data Trace idp term = Call (GoalF idp term)(GoalF idp term)
                     | Exit (GoalF idp term)
                     | Fail (GoalF idp term)
