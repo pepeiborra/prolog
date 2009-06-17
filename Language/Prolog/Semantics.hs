@@ -50,12 +50,12 @@ import Language.Prolog.Syntax
 eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM termF var), Traversable termF, Unify termF) => Program'' idp term -> GoalF idp term -> [Substitution termF var]
 eval pgm q = (fmap (restrictTo vq .  zonkSubst . snd) . filter (fst.fst) . runEnvM' i . runWriterT . run pgm) q
     where i    = maximum (0 : map fromEnum vq) + 1
-          vq = snub(getVars q)
+          vq = Set.toList(getVars q)
 
 debug :: (Eq id, Eq idp, term ~ Term' id Var) => Program'' idp term -> GoalF idp term -> [[Trace idp term]]
 debug pgm q =  (evalEnvM' i . execWriterT . run pgm) q
   where
-    i = maximum (0 : map fromEnum (getVars q)) + 1
+    i = maximum (0 : map fromEnum (Set.toList $ getVars q)) + 1
 
 run :: forall var var0 termF idp term term0 m.
        (Ord var, Ord var0, Eq (termF ()), Eq idp, Traversable termF,
