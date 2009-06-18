@@ -23,6 +23,7 @@ Library
      Language.Prolog.Parser
      Language.Prolog.Syntax
      Language.Prolog.Semantics
+     Text.ParserCombinators.Parsec.Applicative
 
 Executable hProlog
   buildable: True

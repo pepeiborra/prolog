@@ -1,25 +1,20 @@
 module Language.Prolog.Parser where
 
-import qualified Control.Applicative as A
 import Control.Applicative hiding ((<|>))
+import qualified Control.Applicative as A
 import Control.Monad.Free
 import Data.Char (isLower)
 import Data.Term.Var (Var)
-import Text.ParserCombinators.Parsec hiding ((<|>), many, optional)
-import qualified Text.ParserCombinators.Parsec as P
 import qualified Text.ParserCombinators.Parsec.Token as P
-import Text.ParserCombinators.Parsec.Language
+import Text.ParserCombinators.Parsec as P hiding ((<|>), many, optional)
+import Text.ParserCombinators.Parsec.Applicative
+import Text.ParserCombinators.Parsec.Language as P
 import Text.ParserCombinators.Parsec.Expr
 
 import qualified Language.Prolog.Syntax as S
 import Language.Prolog.Syntax hiding (term, var, ident, int, float, string)
 
 type Comment = String
-
-infixr 0 <|>
-
-(<|>) :: Alternative f => f a -> f a -> f a
-(<|>) = (A.<|>)
 
 program  :: GenParser Char st [Clause String]
 program   = whiteSpace *> many1 clause <* eof
@@ -140,11 +135,10 @@ identLiteral = lexeme (between (char '\'')
                      ) <?> "quoted identifier"
   where anythingButQuote = try ( char '\'' >> char '\'' >> return '\'' ) <|> noneOf "'"
 
--- Applicative instances for Parsec
--- ---------------------------------
-instance Applicative (GenParser c st) where
-    pure = return
-    (<*>) = ap
-instance Alternative (GenParser c st) where
-    (<|>) = (P.<|>)
-    empty = pzero
+-- Other
+-- -----
+
+-- lowering the precedence of <|> to make it more useful
+infixr 0 <|>
+(<|>) :: Alternative f => f a -> f a -> f a
+(<|>) = (A.<|>)
