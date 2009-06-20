@@ -16,12 +16,34 @@ import Language.Prolog.Syntax hiding (term, var, ident, int, float, string)
 
 type Comment = String
 
-program  :: GenParser Char st [Clause String]
-program   = whiteSpace *> many1 clause <* eof
+program  :: GenParser Char st [Either [Goal String] (Clause String)]
+program   = whiteSpace *> (concat <$> many1 (Left <$$> query <|> Right <$$> clause)) <* eof
+  where (<$$>) = fmap . fmap
 
-clause    = ((:-) <$> goal <*> (reservedOp ":-" *> commaSep1 goal <|> return [])) <* dot
+clause    = do
+  g <- goal
+  cc_sets <- (reservedOp ":-" *> body) <|> return []
+  dot
+  return [g :- cc | cc <- cc_sets]
 
-query = (reservedOp ":-" *> commaSep1 goal) <* optional dot
+query = reservedOp ":-" *> body <* dot
+
+body = buildExpressionParser table factor  <?> "body"
+  where
+   table   = [[Infix (comma >> return merge) AssocLeft]
+             ,[op ";" (++) AssocLeft, op "|" (++) AssocLeft]
+             ]
+   op s f assoc = Infix (do{reservedOp s; return f}) assoc
+   factor       = (try(parens body) <|> return2 <$> goal) <?> "goal"
+   return2      = return . return
+   merge cc1 cc2 = [ c1 ++ c2 | c1 <- cc1, c2 <- cc2]
+
+{-
+  group_goals <- parens (commaSep1 goal `sepBy1` (reservedOp ";" <|> reservedOp "|")) <|> return []
+  dot
+  return (map (global_goals ++) group_goals)
+-}
+
 goal = (reservedOp "!" >> return Cut <|>
         try infixGoal <|>
         Pred <$> ident <*> (parens (commaSep1 term) <|> return [])
@@ -105,6 +127,7 @@ natural   = P.natural lexer
 parens    = P.parens lexer
 brackets  = P.brackets lexer
 dot       = P.dot lexer
+comma     = P.comma lexer
 semi      = P.semi lexer
 identifier= P.identifier lexer
 reserved  = P.reserved lexer

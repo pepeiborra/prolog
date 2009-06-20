@@ -42,7 +42,7 @@ runCommand cc "??" = outputStrLn (show $ ppr cc) >> loop cc
 runCommand cc input = do
   case parse clause "<clause>"  (dropWhile isSpace input) of
     Left err -> outputStrLn $ show err
-    Right c  -> loop (c:cc)
+    Right c  -> loop (c ++ cc)
 
 printSols [] = outputStrLn "no" >> return ()
 printSols [s] | isEmpty s = outputStrLn "Yes"
