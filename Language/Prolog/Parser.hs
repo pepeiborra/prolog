@@ -36,9 +36,8 @@ infixGoal = do
     Pred "->" _ -> do {string ";"; t3 <- term; return (Ifte t1 t2 t3)} `mplus` return res
     _           -> return res
 
-term_basic = (var                                  <|>
+term_basic = (varOrWildcard                        <|>
               simple                               <|>
-              lexeme (char '_') >> return wildcard <|>
               S.int    <$> integer                 <|>
               S.float  <$> float                   <|>
               S.string <$> stringLiteral           <|>
@@ -50,11 +49,19 @@ simple = aterm <|> atuple where
     aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
     atuple = S.tuple <$> parens(commaSep1 term)
 
-var :: (Functor f) => GenParser Char st (Free f Var)
-var       = lexeme$ do
-  first <- upper
+varOrWildcard :: GenParser Char st (Free (TermF id) Var)
+varOrWildcard = lexeme$ do
+  first <- (upper <|> char '_')
   rest  <- many (alphaNum <|> char '_')
-  return (S.var (first : rest))
+  return $ case (first,rest) of
+             ('_', []) -> wildcard
+             _         -> (S.var (first : rest))
+
+var :: (Functor t) =>GenParser Char st (Free t Var)
+var = lexeme$ do
+  first <- (upper <|> char '_')
+  rest  <- many (alphaNum <|> char '_')
+  return $ (S.var (first : rest))
 
 ident      = (identifier  <|>
              identLiteral <|>
