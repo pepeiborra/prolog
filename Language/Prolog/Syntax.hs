@@ -37,6 +37,7 @@ data ClauseF f = f :- [f] deriving (Eq, Ord, Show)
 data GoalF id f= Pred {pred::id,args::[f]}
                | f :=: f
                | Is f f
+               | Ifte f f f
                | Cut
    deriving (Eq, Ord, Show)
 data TermF id f= Term {functor::id, fargs::[f]}

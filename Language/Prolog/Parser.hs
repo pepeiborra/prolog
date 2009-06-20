@@ -31,7 +31,10 @@ infixGoal = do
   t1 <- term
   op <- (((\op x y -> Pred op [x,y]) <$> operator) <|> pure Is <* reserved "is") <?> "operator"
   t2 <- term
-  return (t1 `op` t2)
+  let res = t1 `op` t2
+  case res of
+    Pred "->" _ -> do {string ";"; t3 <- term; return (Ifte t1 t2 t3)} `mplus` return res
+    _           -> return res
 
 term_basic = (var                                  <|>
               simple                               <|>
