@@ -31,9 +31,9 @@ isModulo(X, Y, Z) :- ','(isDiv(X, Y, A), ','(isTimes(A, Y, B), isMinus(X, B, Z))
 =(X, X).
 succ(X) > zero.
 succ(X) > pred(Y).
-succ(X) > succ(Y)) :- X > Y.
+succ(X) > succ(Y) :- X > Y.
 zero > pred(Y).
-pred(X) > pred(Y)) :- X > Y.
+pred(X) > pred(Y) :- X > Y.
 pred(X) < zero.
 pred(X) < succ(Y).
 pred(X) < pred(Y) :- X < Y.
