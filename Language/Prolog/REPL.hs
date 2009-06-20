@@ -19,7 +19,7 @@ main = do
    [fp] -> either (error.show) start =<< parseFromFile program fp
 
 start cc = do putStrLn usage
-              runInputT defaultSettings (loop cc)
+              runInputT defaultSettings (loop [c | Right c <- cc])
 
 loop cc =  do
   c <- getInputLine "| "
