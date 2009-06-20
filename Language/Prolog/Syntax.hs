@@ -19,7 +19,8 @@ module Language.Prolog.Syntax (
 
 import Control.Applicative
 import Control.Monad.Free
-import Data.Foldable as F
+import Data.Char
+import Data.Foldable as F (Foldable(..), toList)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -119,6 +120,23 @@ instance (Ppr id, Ppr v) => Ppr (TermF id (Free (TermF id) v)) where
     ppr (Int i)     = Ppr.integer i
     ppr (Float i)   = double i
     ppr Wildcard    = char '_'
+
+instance Ppr v => Ppr (TermF String (Term' String v)) where
+    ppr (Term f []) = pprS f
+    ppr (Term f tt) = pprS f <> parens (hcat (punctuate comma $ map ppr tt))
+    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
+    ppr (Cons h t)
+        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map ppr (h:elems))
+        | otherwise   = brackets (ppr h <> text "|" <> ppr t)
+      where getElems (Impure Nil) = Just []
+            getElems (Impure (Cons a b)) = (a :) `fmap` getElems b
+            getElems _ = Nothing
+    ppr Nil         = brackets (Ppr.empty)
+    ppr (Int i)     = Ppr.integer i
+    ppr (Float i)   = double i
+    ppr Wildcard    = char '_'
+
+pprS string = if any isSpace string then quotes (text string) else text string
 
 instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
     ppr (Pred f []) = ppr f
