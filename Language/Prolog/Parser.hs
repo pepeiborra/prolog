@@ -22,7 +22,7 @@ program   = whiteSpace *> (concat <$> many1 (Left <$$> query <|> Right <$$> clau
 
 clause    = do
   g <- goal
-  cc_sets <- (reservedOp ":-" *> body) <|> return []
+  cc_sets <- (reservedOp ":-" *> body) <|> return [[]]
   dot
   return [g :- cc | cc <- cc_sets]
 
