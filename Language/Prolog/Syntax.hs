@@ -13,12 +13,13 @@ module Language.Prolog.Syntax (
      Program'', Clause'',
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
-     mapTermId, mapPredId,
+     mapPredId,
      Ppr(..)
      ) where
 
 import Control.Applicative
 import Control.Monad.Free
+import Data.Bifunctor
 import Data.Char
 import Data.Foldable as F (Foldable(..), toList)
 import Data.Monoid
@@ -83,18 +84,8 @@ string   = Impure . String
 wildcard = Impure Wildcard
 
 mapTermId :: (id -> id') -> TermF id a -> TermF id' a
-mapTermId f (Term id a) = Term (f id) a
-mapTermId _ (Tuple tt)  = Tuple tt
-mapTermId _ (Int i)     = Int i
-mapTermId _ (Float f)   = Float f
-mapTermId _ (String s)  = String s
-mapTermId _ Wildcard    = Wildcard
-
-mapPredId f (Pred id tt) = Pred (f id) tt
-mapPredId _ (Is t1 t2)   = Is t1 t2
-mapPredId _ (t1 :=: t2)  = t1 :=: t2
-mapPredId _ Cut          = Cut
-
+mapTermId f = bimap f id
+mapPredId f = bimap f id
 
 instance (Ppr id, Ppr a) => Ppr (TermF id a) where
     ppr (Term f []) = ppr f
@@ -158,11 +149,11 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-instance Functor     (GoalF id) where
-    fmap     f (Pred a tt) = Pred a (fmap f tt)
-    fmap     f Cut         = Cut
-    fmap     f (Is a b)    = Is (f a) (f b)
-    fmap     f (a :=: b)   = f a :=: f b
+instance Bifunctor GoalF where
+    bimap fid f (Pred a tt) = Pred (fid a) (fmap f tt)
+    bimap fid f Cut         = Cut
+    bimap fid f (Is a b)    = Is (f a) (f b)
+    bimap fid f (a :=: b)   = f a :=: f b
 instance Foldable    (GoalF id) where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
@@ -174,14 +165,14 @@ instance Traversable (GoalF id) where
     traverse f (Is a b)    = Is    <$> f a <*> f b
     traverse f (a :=: b)   = (:=:) <$> f a <*> f b
 
-instance Functor (TermF id) where
-    fmap     f (Term a tt) = Term a (fmap f tt)
-    fmap     f (Tuple  tt) = Tuple  (fmap f tt)
-    fmap     f (Cons h t)  = Cons (f h) (f t)
-    fmap     _ Nil         = Nil
-    fmap     f (Int i)     = Int i
-    fmap     f (Float d)   = Float d
-    fmap     f Wildcard    = Wildcard
+instance Bifunctor TermF where
+    bimap fid f (Term a tt) = Term (fid a) (fmap f tt)
+    bimap _   f (Tuple  tt) = Tuple  (fmap f tt)
+    bimap _   f (Cons h t)  = Cons (f h) (f t)
+    bimap _   _ Nil         = Nil
+    bimap _   _ (Int i)     = Int i
+    bimap _   _ (Float d)   = Float d
+    bimap _   _ Wildcard    = Wildcard
 instance Foldable (TermF id) where
     foldMap  f (Term a tt) = foldMap f tt
     foldMap  f (Tuple  tt) = foldMap f tt
@@ -206,6 +197,9 @@ instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getM
 instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
 instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
 
+
+instance HasId (TermF id) id where getId (Term id _) = Just id
+                                   getId _           = Nothing
 
 instance (Show id, Ord id) => HasSignature (Program' id var) id where
   getSignature cc = let aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
