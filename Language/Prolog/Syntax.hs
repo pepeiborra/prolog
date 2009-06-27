@@ -1,6 +1,6 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, PatternGuards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverlappingInstances #-}
@@ -11,6 +11,7 @@ module Language.Prolog.Syntax (
      Program, Clause, Goal, Term,
      Program', Clause', Goal', Term',
      Program'', Clause'',
+     ProgramI,  ClauseI,
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
      mapPredId,
@@ -49,6 +50,9 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | Float Double
                | String String
                | Wildcard deriving (Eq, Ord, Show)
+
+type ProgramI idp idt = [ClauseI idp idt]
+type ClauseI  idp idt =  ClauseF (GoalF idp (Term' idt Var))
 
 type Program'' id term = [Clause'' id term]
 type Clause''  id term = ClauseF (GoalF id term)
