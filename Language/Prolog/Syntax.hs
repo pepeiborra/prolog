@@ -201,16 +201,18 @@ instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getM
 instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
 instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
 
-
 instance HasId (TermF id) id where getId (Term id _) = Just id
                                    getId _           = Nothing
 
-instance (Show id, Ord id) => HasSignature (Program' id var) id where
-  getSignature cc = let aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
-                        aritiesF = Map.fromList [ (f, length tt) | Pred _ args <- F.toList =<< cc, Impure(Term f tt) <- subterms =<< args ]
-                        functors = Map.keysSet aritiesF
-                        preds    = Map.keysSet aritiesP
-                        in Sig {constructorSymbols = functors, definedSymbols = preds, arity = aritiesP `mappend` aritiesF}
+instance (HasId termF id, Foldable termF, Ord id) => HasSignature (Program'' id (Free termF v)) id where
+  getSignature cc = Sig {constructorSymbols = functors, definedSymbols = preds, arity = aritiesP `mappend` aritiesF}
+   where
+    aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
+    aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId t]]
+    functors = Map.keysSet aritiesF
+    preds    = Map.keysSet aritiesP
+
+instance (HasId termF id, Foldable termF, Ord id) => HasSignature (ClauseF (GoalF id (Free termF v))) id where getSignature c = getSignature [c]
 
 -- Other
 -- -----
