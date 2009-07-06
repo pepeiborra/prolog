@@ -7,7 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Language.Prolog.Syntax (
-     ClauseF(..), GoalF(..), TermF(..),
+     ClauseF(..), cHead, cBody, GoalF(..), TermF(..),
      Program, Clause, Goal, Term,
      Program', Clause', Goal', Term',
      Program'', Clause'',
@@ -66,6 +66,12 @@ type Program id = [Clause id]
 type Clause  id = ClauseF (Goal id)
 type Goal    id = GoalF id (Term id)
 type Term    id = Term' id Var
+
+cHead :: ClauseF a -> a
+cBody :: ClauseF a -> [a]
+
+cHead (h :- _) = h
+cBody (_ :- b) = b
 
 ident :: id -> Term' id a
 ident f = term f []
