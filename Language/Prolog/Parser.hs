@@ -51,7 +51,10 @@ goal = (reservedOp "!" >> return Cut <|>
 
 infixGoal = do
   t1 <- term
-  op <- (((\op x y -> Pred op [x,y]) <$> operator) <|> pure Is <* reserved "is") <?> "operator"
+  op <- msum [ reservedOp "="  >> return (:=:)
+             , reserved   "is" >> return Is
+             , do {op <- operator; return (\x y -> Pred op [x,y])} ]
+           <?> "operator"
   t2 <- term
   let res = t1 `op` t2
   case res of
@@ -152,7 +155,7 @@ prologStyle= emptyDef
                 , identLetter	 = alphaNum <|> oneOf "+-*=/\\^`~:?@#$&_"
                 , opStart	 = opLetter prologStyle
                 , opLetter	 = oneOf "<>!=~|&"
-                , reservedOpNames= []
+                , reservedOpNames= ["="]
                 , reservedNames  = []
                 , caseSensitive  = True
                 }
