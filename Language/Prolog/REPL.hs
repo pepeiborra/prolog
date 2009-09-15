@@ -7,7 +7,7 @@ import Language.Prolog.Parser
 import Language.Prolog.Syntax
 import Language.Prolog.Semantics
 import Text.ParserCombinators.Parsec hiding (space)
-import Text.PrettyPrint (vcat, punctuate, space)
+import Text.PrettyPrint.HughesPJClass (vcat, punctuate, space)
 
 import System.Environment
 import System.Console.Haskeline
@@ -35,10 +35,10 @@ runCommand cc ('?':'-':rest) = do
 runCommand cc ('?':'?':'-':rest) = do
   case parse goal "<goal>" (dropWhile isSpace rest) of
     Left err -> outputStrLn $ show err
-    Right g  -> outputStrLn (show $ vcat $ punctuate space $ map ppr $ debug cc g)
+    Right g  -> outputStrLn (show $ vcat $ punctuate space $ map pPrint $ debug cc g)
   loop cc
 
-runCommand cc "??" = outputStrLn (show $ ppr cc) >> loop cc
+runCommand cc "??" = outputStrLn (show $ pPrint cc) >> loop cc
 runCommand cc input = do
   case parse clause "<clause>"  (dropWhile isSpace input) of
     Left err -> outputStrLn $ show err
@@ -47,7 +47,7 @@ runCommand cc input = do
 printSols [] = outputStrLn "no" >> return ()
 printSols [s] | isEmpty s = outputStrLn "Yes"
 printSols (s:rest) = do
-  outputStr (show $ ppr s)
+  outputStr (show $ pPrint s)
   l <- getInputLine "? "
   case l of
     Just ";" -> printSols rest

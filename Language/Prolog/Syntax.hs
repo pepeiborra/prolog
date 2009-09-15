@@ -15,7 +15,7 @@ module Language.Prolog.Syntax (
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
      mapPredId,
-     Ppr(..)
+     Pretty(..)
      ) where
 
 import Control.Applicative
@@ -29,11 +29,10 @@ import qualified Data.Set as Set
 import Data.Term hiding (Term)
 import Data.Term.Rules
 import Data.Term.Var
-import Data.Term.Ppr
 import Data.Traversable as T
 
-import Text.PrettyPrint hiding (int, float)
-import qualified Text.PrettyPrint as Ppr
+import Text.PrettyPrint.HughesPJClass hiding (int, float)
+import qualified Text.PrettyPrint.HughesPJClass as Ppr
 
 data ClauseF f = f :- [f] deriving (Eq, Ord, Show)
 data GoalF id f= Pred {pred::id,args::[f]}
@@ -97,61 +96,61 @@ mapTermId :: (id -> id') -> TermF id a -> TermF id' a
 mapTermId f = bimap f id
 mapPredId f = bimap f id
 
-instance (Ppr id, Ppr a) => Ppr (TermF id a) where
-    ppr (Term f []) = ppr f
-    ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Cons h t)  = brackets (ppr h <> text "|" <> ppr t)
-    ppr Nil         = brackets (Ppr.empty)
-    ppr (Int i)     = Ppr.integer i
-    ppr (Float i)   = double i
-    ppr Wildcard    = char '_'
+instance (Pretty id, Pretty a) => Pretty (TermF id a) where
+    pPrint (Term f []) = pPrint f
+    pPrint (Term f tt) = pPrint f <> parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Cons h t)  = brackets (pPrint h <> text "|" <> pPrint t)
+    pPrint Nil         = brackets (Ppr.empty)
+    pPrint (Int i)     = pPrint i
+    pPrint (Float i)   = double i
+    pPrint Wildcard    = char '_'
 
---instance (Ppr a, Ppr id) => Ppr (TermF id a) where
-instance (Ppr id, Ppr v) => Ppr (TermF id (Free (TermF id) v)) where
-    ppr (Term f []) = ppr f
-    ppr (Term f tt) = ppr f <> parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Cons h t)
-        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map ppr (h:elems))
-        | otherwise   = brackets (ppr h <> text "|" <> ppr t)
+--instance (Ppr a, Pretty id) => Pretty (TermF id a) where
+instance (Pretty id, Pretty v) => Pretty (TermF id (Free (TermF id) v)) where
+    pPrint (Term f []) = pPrint f
+    pPrint (Term f tt) = pPrint f <> parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Cons h t)
+        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map pPrint (h:elems))
+        | otherwise   = brackets (pPrint h <> text "|" <> pPrint t)
       where getElems (Impure Nil) = Just []
             getElems (Impure (Cons a b)) = (a :) `fmap` getElems b
             getElems _ = Nothing
-    ppr Nil         = brackets (Ppr.empty)
-    ppr (Int i)     = Ppr.integer i
-    ppr (Float i)   = double i
-    ppr Wildcard    = char '_'
+    pPrint Nil         = brackets (Ppr.empty)
+    pPrint (Int i)     = pPrint i
+    pPrint (Float i)   = double i
+    pPrint Wildcard    = char '_'
 
-instance Ppr v => Ppr (TermF String (Term' String v)) where
-    ppr (Term f []) = pprS f
-    ppr (Term f tt) = pprS f <> parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Tuple tt ) = parens (hcat (punctuate comma $ map ppr tt))
-    ppr (Cons h t)
-        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map ppr (h:elems))
-        | otherwise   = brackets (ppr h <> text "|" <> ppr t)
+instance Pretty v => Pretty (TermF String (Term' String v)) where
+    pPrint (Term f []) = pPrintS f
+    pPrint (Term f tt) = pPrintS f <> parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Cons h t)
+        | Just elems <- getElems t = brackets (hcat $ punctuate comma $ map pPrint (h:elems))
+        | otherwise   = brackets (pPrint h <> text "|" <> pPrint t)
       where getElems (Impure Nil) = Just []
             getElems (Impure (Cons a b)) = (a :) `fmap` getElems b
             getElems _ = Nothing
-    ppr Nil         = brackets (Ppr.empty)
-    ppr (Int i)     = Ppr.integer i
-    ppr (Float i)   = double i
-    ppr Wildcard    = char '_'
+    pPrint Nil         = brackets (Ppr.empty)
+    pPrint (Int i)     = pPrint i
+    pPrint (Float i)   = double i
+    pPrint Wildcard    = char '_'
 
-pprS string = if any isSpace string then quotes (text string) else text string
+pPrintS string = if any isSpace string then quotes (text string) else text string
 
-instance (Ppr idp, Ppr term) => Ppr (GoalF idp term) where
-    ppr (Pred f []) = ppr f
-    ppr (Pred f tt) = ppr f <> parens(hcat (punctuate comma $ map ppr tt))
-    ppr Cut         = text "!"
-    ppr (a `Is` b)  = ppr a <+> text "is" <+> ppr b
-    ppr (a :=: b)  = ppr a <+> text "=" <+> ppr b
+instance (Pretty idp, Pretty term) => Pretty (GoalF idp term) where
+    pPrint (Pred f []) = pPrint f
+    pPrint (Pred f tt) = pPrint f <> parens(hcat (punctuate comma $ map pPrint tt))
+    pPrint Cut         = text "!"
+    pPrint (a `Is` b)  = pPrint a <+> text "is" <+> pPrint b
+    pPrint (a :=: b)  = pPrint a <+> text "=" <+> pPrint b
 
-instance Ppr a => Ppr (ClauseF a)  where
-    ppr (h :- []) = ppr h <> char '.'
-    ppr (h :- t) = ppr h <+> text ":-" <+> hcat(punctuate comma (map ppr t)) <> char '.'
+instance Pretty a => Pretty (ClauseF a)  where
+    pPrint (h :- []) = pPrint h <> char '.'
+    pPrint (h :- t)  = pPrint h <+> text ":-" <+> hcat(punctuate comma (map pPrint t)) <> char '.'
+    pPrintList l     = vcat . map pPrint
 
-instance (Ppr idp, Ppr term) => Ppr (Program'' idp term) where ppr = vcat . map ppr
 
 -- Functor boilerplate
 -- --------------------
@@ -207,18 +206,22 @@ instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getM
 instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
 instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
 
-instance HasId (TermF id) id where getId (Term id _) = Just id
-                                   getId _           = Nothing
+instance Ord id => HasId (TermF id) where
+    type TermId (TermF id) = id
+    getId (Term id _) = Just id
+    getId _           = Nothing
 
-instance (HasId termF id, Foldable termF, Ord id) => HasSignature (Program'' id (Free termF v)) id where
-  getSignature cc = Sig {constructorSymbols = functors, definedSymbols = preds, arity = aritiesP `mappend` aritiesF}
+instance (HasId termF, TermId termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
+  type SignatureId (Program'' id (Free termF v)) = id
+  getSignature cc = Sig {constructorSymbols = aritiesF, definedSymbols = aritiesP}
    where
     aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
     aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId t]]
-    functors = Map.keysSet aritiesF
-    preds    = Map.keysSet aritiesP
 
-instance (HasId termF id, Foldable termF, Ord id) => HasSignature (ClauseF (GoalF id (Free termF v))) id where getSignature c = getSignature [c]
+instance (HasId termF, TermId termF ~ id, Ord id, Foldable termF) =>
+    HasSignature (ClauseF (GoalF id (Free termF v))) where
+  type SignatureId (ClauseF (GoalF id (Free termF v))) = id
+  getSignature c = getSignature [c]
 
 -- Other
 -- -----

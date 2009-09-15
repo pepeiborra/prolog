@@ -39,7 +39,7 @@ import Data.Term.Var
 import Data.Term.IOVar
 import Data.Term hiding (unify)
 import qualified Data.Term as Term
-import Text.PrettyPrint
+import Text.PrettyPrint.HughesPJClass
 
 import Prelude hiding (mapM)
 
@@ -80,10 +80,10 @@ data Trace idp term = Call (GoalF idp term)(GoalF idp term)
                     | Fail (GoalF idp term)
          deriving Show
 
-instance (Ppr term, Ppr idp) => Ppr (Trace idp term) where
-  ppr(Call g h) = text "Call" <+> ppr g <+> ppr h
-  ppr(Exit g) = text "Exit" <+> ppr g
-  ppr(Fail g) = text "Fail" <+> ppr g
+instance (Pretty term, Pretty idp) => Pretty (Trace idp term) where
+  pPrint(Call g h) = text "Call" <+> pPrint g <+> pPrint h
+  pPrint(Exit g) = text "Exit" <+> pPrint g
+  pPrint(Fail g) = text "Fail" <+> pPrint g
 -- -----------------
 -- Environment Monad
 -- -----------------
