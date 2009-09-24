@@ -106,6 +106,16 @@ instance (Pretty id, Pretty a) => Pretty (TermF id a) where
     pPrint (Float i)   = double i
     pPrint Wildcard    = char '_'
 
+instance (Pretty a) => Pretty (TermF String a) where
+    pPrint (Term f []) = pPrintS f
+    pPrint (Term f tt) = pPrintS f <> parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
+    pPrint (Cons h t)  = brackets (pPrint h <> text "|" <> pPrint t)
+    pPrint Nil         = brackets (Ppr.empty)
+    pPrint (Int i)     = pPrint i
+    pPrint (Float i)   = double i
+    pPrint Wildcard    = char '_'
+
 --instance (Ppr a, Pretty id) => Pretty (TermF id a) where
 instance (Pretty id, Pretty v) => Pretty (TermF id (Free (TermF id) v)) where
     pPrint (Term f []) = pPrint f
@@ -142,6 +152,13 @@ pPrintS string = if any isSpace string then quotes (text string) else text strin
 instance (Pretty idp, Pretty term) => Pretty (GoalF idp term) where
     pPrint (Pred f []) = pPrint f
     pPrint (Pred f tt) = pPrint f <> parens(hcat (punctuate comma $ map pPrint tt))
+    pPrint Cut         = text "!"
+    pPrint (a `Is` b)  = pPrint a <+> text "is" <+> pPrint b
+    pPrint (a :=: b)  = pPrint a <+> text "=" <+> pPrint b
+
+instance (Pretty term) => Pretty (GoalF String term) where
+    pPrint (Pred f []) = pPrintS f
+    pPrint (Pred f tt) = pPrintS f <> parens(hcat (punctuate comma $ map pPrint tt))
     pPrint Cut         = text "!"
     pPrint (a `Is` b)  = pPrint a <+> text "is" <+> pPrint b
     pPrint (a :=: b)  = pPrint a <+> text "=" <+> pPrint b

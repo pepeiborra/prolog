@@ -80,7 +80,7 @@ data Trace idp term = Call (GoalF idp term)(GoalF idp term)
                     | Fail (GoalF idp term)
          deriving Show
 
-instance (Pretty term, Pretty idp) => Pretty (Trace idp term) where
+instance (Pretty (GoalF idp term)) => Pretty (Trace idp term) where
   pPrint(Call g h) = text "Call" <+> pPrint g <+> pPrint h
   pPrint(Exit g) = text "Exit" <+> pPrint g
   pPrint(Fail g) = text "Fail" <+> pPrint g
