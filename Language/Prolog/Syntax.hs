@@ -117,7 +117,7 @@ instance (Pretty a) => Pretty (TermF String a) where
     pPrint Wildcard    = char '_'
 
 --instance (Ppr a, Pretty id) => Pretty (TermF id a) where
-instance (Pretty id, Pretty v) => Pretty (TermF id (Free (TermF id) v)) where
+instance (Pretty id, Pretty (Free (TermF id) v)) => Pretty (TermF id (Free (TermF id) v)) where
     pPrint (Term f []) = pPrint f
     pPrint (Term f tt) = pPrint f <> parens (hcat (punctuate comma $ map pPrint tt))
     pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
@@ -132,7 +132,7 @@ instance (Pretty id, Pretty v) => Pretty (TermF id (Free (TermF id) v)) where
     pPrint (Float i)   = double i
     pPrint Wildcard    = char '_'
 
-instance Pretty v => Pretty (TermF String (Term' String v)) where
+instance (Pretty (Term' String v)) => Pretty (TermF String (Term' String v)) where
     pPrint (Term f []) = pPrintS f
     pPrint (Term f tt) = pPrintS f <> parens (hcat (punctuate comma $ map pPrint tt))
     pPrint (Tuple tt ) = parens (hcat (punctuate comma $ map pPrint tt))
