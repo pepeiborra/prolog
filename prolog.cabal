@@ -14,7 +14,7 @@ Flag transformers
 
 Library
   buildable: True
-  build-depends: base, parsec, prettyclass, containers, term > 0.1, control-monad-free >= 0.4 
+  build-depends: base, parsec, prettyclass, logict, containers, term >= 0.1.20090915, control-monad-free >= 0.4 
   if flag(transformers)
      build-depends: transformers, monads-fd
   else
