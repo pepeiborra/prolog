@@ -1,5 +1,5 @@
 name: prolog
-version: 0.1.20090915
+version: 0.1.20091013
 build-type: Simple
 Cabal-Version:  >= 1.2
 license: PublicDomain
