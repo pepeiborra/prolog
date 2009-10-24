@@ -116,7 +116,6 @@ instance (Pretty a) => Pretty (TermF String a) where
     pPrint (Float i)   = double i
     pPrint Wildcard    = char '_'
 
---instance (Ppr a, Pretty id) => Pretty (TermF id a) where
 instance (Pretty id, Pretty (Free (TermF id) v)) => Pretty (TermF id (Free (TermF id) v)) where
     pPrint (Term f []) = pPrint f
     pPrint (Term f tt) = pPrint f <> parens (hcat (punctuate comma $ map pPrint tt))

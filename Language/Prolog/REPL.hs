@@ -3,6 +3,7 @@ module Language.Prolog.REPL where
 import Control.Monad.Trans
 import Data.Char
 import Data.Term
+import Data.Term.Ppr
 import Language.Prolog.Parser
 import Language.Prolog.Syntax
 import Language.Prolog.Semantics
