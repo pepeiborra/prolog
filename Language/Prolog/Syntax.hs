@@ -29,7 +29,7 @@ import qualified Data.Set as Set
 import Data.Term hiding (Term)
 import Data.Term.Rules
 import Data.Term.Var
-import Data.Traversable as T
+import Data.Traversable (Traversable, traverse)
 
 import Text.PrettyPrint.HughesPJClass hiding (int, float)
 import qualified Text.PrettyPrint.HughesPJClass as Ppr
@@ -174,11 +174,11 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-instance Bifunctor GoalF where
-    bimap fid f (Pred a tt) = Pred (fid a) (fmap f tt)
-    bimap fid f Cut         = Cut
-    bimap fid f (Is a b)    = Is (f a) (f b)
-    bimap fid f (a :=: b)   = f a :=: f b
+instance BifunctorM GoalF where
+    bimapM fid f (Pred a tt) = liftM2 Pred (fid a) (mapM f tt)
+    bimapM fid f Cut         = return Cut
+    bimapM fid f (Is a b)    = liftM2 Is (f a) (f b)
+    bimapM fid f (a :=: b)   = liftM2 (:=:) (f a) (f b)
 instance Foldable    (GoalF id) where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
@@ -190,14 +190,14 @@ instance Traversable (GoalF id) where
     traverse f (Is a b)    = Is    <$> f a <*> f b
     traverse f (a :=: b)   = (:=:) <$> f a <*> f b
 
-instance Bifunctor TermF where
-    bimap fid f (Term a tt) = Term (fid a) (fmap f tt)
-    bimap _   f (Tuple  tt) = Tuple  (fmap f tt)
-    bimap _   f (Cons h t)  = Cons (f h) (f t)
-    bimap _   _ Nil         = Nil
-    bimap _   _ (Int i)     = Int i
-    bimap _   _ (Float d)   = Float d
-    bimap _   _ Wildcard    = Wildcard
+instance BifunctorM TermF where
+    bimapM fid f (Term a tt) = liftM2 Term (fid a) (mapM f tt)
+    bimapM _   f (Tuple  tt) = Tuple `liftM` mapM f tt
+    bimapM _   f (Cons h t)  = liftM2 Cons (f h) (f t)
+    bimapM _   _ Nil         = return Nil
+    bimapM _   _ (Int i)     = return $ Int i
+    bimapM _   _ (Float d)   = return $ Float d
+    bimapM _   _ Wildcard    = return Wildcard
 instance Foldable (TermF id) where
     foldMap  f (Term a tt) = foldMap f tt
     foldMap  f (Tuple  tt) = foldMap f tt
