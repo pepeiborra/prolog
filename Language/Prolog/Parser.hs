@@ -7,7 +7,6 @@ import Data.Char (isLower)
 import Data.Term.Var (Var)
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec as P hiding ((<|>), many, optional)
-import Text.ParserCombinators.Parsec.Applicative
 import Text.ParserCombinators.Parsec.Language as P
 import Text.ParserCombinators.Parsec.Expr
 

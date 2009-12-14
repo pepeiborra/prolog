@@ -14,7 +14,7 @@ Flag transformers
 
 Library
   buildable: True
-  build-depends: base, parsec, prettyclass, logict, containers, term >= 0.1.20090915, control-monad-free >= 0.4 
+  build-depends: base, parsec > 3, prettyclass, logict, containers, term >= 0.1.20090915, control-monad-free >= 0.4 
   if flag(transformers)
      build-depends: transformers, monads-fd
   else
@@ -23,7 +23,7 @@ Library
      Language.Prolog.Parser
      Language.Prolog.Syntax
      Language.Prolog.Semantics
-     Text.ParserCombinators.Parsec.Applicative
+--     Text.ParserCombinators.Parsec.Applicative
 
 Executable hProlog
   buildable: True
