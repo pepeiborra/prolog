@@ -1,7 +1,7 @@
 name: prolog
-version: 0.1.20091013
+version: 0.1.20091214
 build-type: Simple
-Cabal-Version:  >= 1.2
+Cabal-Version:  >= 1.6
 license: PublicDomain
 homepage: http://github.com/pepeiborra/prolog
 synopsis: Prolog Parsec based parser
@@ -26,7 +26,7 @@ Library
 --     Text.ParserCombinators.Parsec.Applicative
 
 Executable hProlog
-  buildable: True
+  buildable: False
   build-depends: haskeline, logict
   main-is: Language/Prolog/REPL.hs
   ghc-options: -main-is Language.Prolog.REPL.main
