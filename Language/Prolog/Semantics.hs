@@ -47,7 +47,7 @@ import Debug.Trace
 
 import Language.Prolog.Syntax
 
-eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadFresh var (EnvM termF var), Traversable termF, Unify termF) => Program'' idp term -> GoalF idp term -> [Substitution termF var]
+eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, MonadVariant var (EnvM termF var), Traversable termF, Unify termF) => Program'' idp term -> GoalF idp term -> [Substitution termF var]
 eval pgm q = (fmap (restrictTo vq .  zonkSubst . snd) . filter (fst.fst) . runEnvM' i . runWriterT . run pgm) q
     where i    = maximum (0 : map fromEnum vq) + 1
           vq = Set.toList(getVars q)
@@ -60,7 +60,7 @@ debug pgm q =  (evalEnvM' i . execWriterT . run pgm) q
 run :: forall var var0 termF idp term term0 m.
        (Ord var, Ord var0, Eq (termF ()), Eq idp, Traversable termF,
         term0 ~ Free termF var0, term ~ Free termF var,
-        MonadLogic m, MonadEnv termF var m, MonadFresh var m, MonadWriter [Trace idp term] m) =>
+        MonadLogic m, MonadEnv termF var m, MonadVariant var m, MonadWriter [Trace idp term] m) =>
        Program'' idp term0 -> GoalF idp term -> m Bool
 run pgm query = go [query] where
   go []         = return True
@@ -93,7 +93,7 @@ newtype EnvM termF var a = EnvM {unEnvM:: (StateT (Sum Int, Substitution termF v
 instance Applicative (EnvM termF var) where (<*>) = ap; pure = return
 deriving instance Enum (Sum Int)
 
-instance MonadFresh Var (EnvM termF Var) where freshVar = (VAuto . getSum . fst) <$> get <* modify (first succ)
+instance MonadVariant Var (EnvM termF Var) where freshVar = (VAuto . getSum . fst) <$> get <* modify (first succ)
 instance (Traversable termF, Ord var) => MonadEnv termF var (EnvM termF var) where
   varBind v t = do {(l,s) <- get; put (l, liftSubst (Map.insert v t) s)}
   lookupVar v = get >>= \(_,s) -> return (lookupSubst v s)
@@ -116,7 +116,7 @@ runEnvM'  i = fmap (second snd) . observeAll . (`runStateT` (Sum  i,mempty)) . u
 instance (Functor termF, MonadEnv termF var m) => MonadEnv termF var (LogicT m) where
   varBind = (lift.) . varBind
   lookupVar = lift . lookupVar
-instance MonadFresh var m => MonadFresh var (LogicT   m) where freshVar = lift freshVar
+instance MonadVariant var m => MonadVariant var (LogicT   m) where freshVar = lift freshVar
 
 
 -- -----------

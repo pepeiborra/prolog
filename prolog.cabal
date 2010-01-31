@@ -1,5 +1,5 @@
 name: prolog
-version: 0.1.20091214
+version: 0.1.20100131
 build-type: Simple
 Cabal-Version:  >= 1.6
 license: PublicDomain
@@ -14,7 +14,7 @@ Flag transformers
 
 Library
   buildable: True
-  build-depends: base, parsec > 3, prettyclass, logict, containers, term >= 0.1.20090915, control-monad-free >= 0.4 
+  build-depends: base, parsec > 3, prettyclass, logict, containers, term >= 0.1.20100131, control-monad-free >= 0.4 
   if flag(transformers)
      build-depends: transformers, monads-fd
   else
