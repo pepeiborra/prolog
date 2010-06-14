@@ -12,6 +12,7 @@ module Language.Prolog.Syntax (
      Program', Clause', Goal', Term',
      Program'', Clause'',
      ProgramI,  ClauseI,
+     goalToTerm, termToGoal,
      ident, term, tuple, var, var',
      cons, nil, int, float, string, wildcard,
      mapPredId,
@@ -38,7 +39,9 @@ data ClauseF f = f :- [f] deriving (Eq, Ord, Show)
 data GoalF id f= Pred {pred::id,args::[f]}
                | f :=: f
                | Is f f
-               | Ifte f f f
+               | Ift  f (GoalF id f)
+               | Ifte f (GoalF id f) (GoalF id f)
+               | Not (GoalF id f)
                | Cut
    deriving (Eq, Ord, Show)
 data TermF id f= Term {functor::id, fargs::[f]}
@@ -96,6 +99,14 @@ mapTermId :: (id -> id') -> TermF id a -> TermF id' a
 mapTermId f = bimap f id
 mapPredId f = bimap f id
 
+goalToTerm :: GoalF id (Term' id var) -> Maybe(Term' id var)
+goalToTerm (Pred f tt) = Just(term f tt)
+goalToTerm _g = const Nothing _g
+
+termToGoal (Impure (Term f tt)) = Just [(Pred f tt)]
+termToGoal (Impure (Tuple tt))  = liftM concat $ mapM termToGoal tt
+termToGoal _t = Nothing
+
 instance (Pretty id, Pretty a) => Pretty (TermF id a) where
     pPrint (Term f []) = pPrint f
     pPrint (Term f tt) = pPrint f <> parens (hcat (punctuate comma $ map pPrint tt))
@@ -152,15 +163,21 @@ instance (Pretty idp, Pretty term) => Pretty (GoalF idp term) where
     pPrint (Pred f []) = pPrint f
     pPrint (Pred f tt) = pPrint f <> parens(hcat (punctuate comma $ map pPrint tt))
     pPrint Cut         = text "!"
+    pPrint (Not t)     = text "\\+" <+> pPrint t
+    pPrint (Ifte c t e)= pPrint c <+> text "->" <+> pPrint t <+> text ";" <+> pPrint e
+    pPrint (Ift c t)   = pPrint c <+> text "->" <+> pPrint t
     pPrint (a `Is` b)  = pPrint a <+> text "is" <+> pPrint b
-    pPrint (a :=: b)  = pPrint a <+> text "=" <+> pPrint b
+    pPrint (a :=: b)   = pPrint a <+> text "=" <+> pPrint b
 
 instance (Pretty term) => Pretty (GoalF String term) where
     pPrint (Pred f []) = pPrintS f
     pPrint (Pred f tt) = pPrintS f <> parens(hcat (punctuate comma $ map pPrint tt))
     pPrint Cut         = text "!"
+    pPrint (Not t)     = text "\\+" <+> pPrint t
     pPrint (a `Is` b)  = pPrint a <+> text "is" <+> pPrint b
-    pPrint (a :=: b)  = pPrint a <+> text "=" <+> pPrint b
+    pPrint (a :=: b)   = pPrint a <+> text "=" <+> pPrint b
+    pPrint (Ifte c t e)= pPrint c <+> text "->" <+> pPrint t <+> text ";" <+> pPrint e
+    pPrint (Ift c t)   = pPrint c <+> text "->" <+> pPrint t
 
 instance Pretty a => Pretty (ClauseF a)  where
     pPrint (h :- []) = pPrint h <> char '.'
@@ -177,18 +194,29 @@ instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traver
 instance BifunctorM GoalF where
     bimapM fid f (Pred a tt) = liftM2 Pred (fid a) (mapM f tt)
     bimapM fid f Cut         = return Cut
+    bimapM fid f (Not t)     = liftM  Not (bimapM fid f t)
     bimapM fid f (Is a b)    = liftM2 Is (f a) (f b)
     bimapM fid f (a :=: b)   = liftM2 (:=:) (f a) (f b)
+    bimapM fid f (Ifte a b c)= liftM3 Ifte (f a) (bimapM fid f b) (bimapM fid f c)
+    bimapM fid f (Ift  a b)  = liftM2 Ift  (f a) (bimapM fid f b)
+
 instance Foldable    (GoalF id) where
     foldMap  f (Pred a tt) = foldMap f tt
     foldMap  f Cut         = mempty
+    foldMap  f (Not t)     = foldMap f t
     foldMap  f (Is a b)    = f a `mappend` f b
     foldMap  f (a :=: b)   = f a `mappend` f b
+    foldMap  f (Ifte a b c)= f a `mappend` foldMap f b `mappend` foldMap f c
+    foldMap  f (Ift  a b)  = f a `mappend` foldMap f b
+
 instance Traversable (GoalF id) where
     traverse f (Pred a tt) = Pred a <$> traverse f tt
     traverse f Cut         = pure Cut
+    traverse f (Not t)     = Not <$> traverse f t
     traverse f (Is a b)    = Is    <$> f a <*> f b
     traverse f (a :=: b)   = (:=:) <$> f a <*> f b
+    traverse f (Ifte a b c)= Ifte <$> f a <*> traverse f b <*> traverse f c
+    traverse f (Ift  a b)  = Ift  <$> f a <*> traverse f b
 
 instance BifunctorM TermF where
     bimapM fid f (Term a tt) = liftM2 Term (fid a) (mapM f tt)

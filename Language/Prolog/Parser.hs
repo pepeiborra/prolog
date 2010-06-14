@@ -33,7 +33,7 @@ body = buildExpressionParser table factor  <?> "body"
              ,[op ";" (++) AssocLeft, op "|" (++) AssocLeft]
              ]
    op s f assoc = Infix (do{reservedOp s; return f}) assoc
-   factor       = (try(parens body) <|> return2 <$> goal) <?> "goal"
+   factor       = ((return2 <$> goal) <|> parens body) <?> "goal"
    return2      = return . return
    merge cc1 cc2 = [ c1 ++ c2 | c1 <- cc1, c2 <- cc2]
 
@@ -43,43 +43,70 @@ body = buildExpressionParser table factor  <?> "body"
   return (map (global_goals ++) group_goals)
 -}
 
-goal = (reservedOp "!" >> return Cut <|>
-        try infixGoal <|>
-        Pred <$> ident <*> (parens (commaSep1 term) <|> return [])
-       ) <?> "goal"
+goal = msum [reservedOp "!" >> return Cut,
+             reservedOp "\\+" >> liftM Not goal,
+             try infixGoal,
+             simpleGoal]
+       <?> "goal"
+  where
+
+    simpleGoal = Pred <$> atom <*> (parens (commaSep1 term) <|> return [])
+
+atom      = lexeme (many1 (alphaNum <|> oneOf "+-*_/\\^<>=`~:?@#$&") <|>
+                    quotedAtom <|>
+                    string "{}" <|>
+                    string ";"
+                   ) <?> "atom"
+ where
+  quotedAtom = quoted (many anythingButQuote) <?> "quoted identifier"
+  anythingButQuote = try ( char '\'' >> char '\'' >> return '\'' ) <|> noneOf "'"
 
 infixGoal = do
   t1 <- term
-  op <- msum [ reservedOp "="  >> return (:=:)
-             , reserved   "is" >> return Is
-             , do {op <- operator; return (\x y -> Pred op [x,y])} ]
-           <?> "operator"
-  t2 <- term
-  let res = t1 `op` t2
-  case res of
-    Pred "->" _ -> do {string ";"; t3 <- term; return (Ifte t1 t2 t3)} `mplus` return res
-    _           -> return res
+  do { reservedOp "->";
+        gt <- goal;
+        do {symbol ";";
+            gf <- goal;
+            return(Ifte t1 gt gf);
+           }
+       <|>
+       return (Ift t1 gt);
+      }
+   <|>
+   do { op <- msum [ reservedOp "="     >> return (:=:)
+                   , symbol     "is"    >> return Is
+                   , reservedOp "\\="   >> return ( (Not.) . (:=:))
+                   , reservedOp "=\\="  >> return ( (Not.) . (:=:))
+                   , reservedOp "\\=="  >> return ( (Not.) . (:=:))
+                   , literalReservedOp ">"
+                   , literalReservedOp ">="
+                   , literalReservedOp "<"
+                   , literalReservedOp "=<"
+                   , do {p <- operator; return (mkPred p)}
+                  ] <?> "operator";
+        t2 <- term;
+        return (op t1 t2);
+      }
+     where literalReservedOp op = do {reservedOp op ; return (mkPred op)}
+           mkPred p t1 t2 = Pred p [t1,t2]
 
-term_basic = (varOrWildcard                        <|>
-              simple                               <|>
-              S.int    <$> integer                 <|>
-              S.float  <$> float                   <|>
-              S.string <$> stringLiteral           <|>
-              try list1                            <|>
-              list2
-             ) <?> "term"
+-- Terms
+-- ------------
+term = term_compound
 
-simple = aterm <|> atuple where
-    aterm  = S.term <$> ident <*> (parens (commaSep1 term) <|> return [])
-    atuple = S.tuple <$> parens(commaSep1 term)
+term_basic = msum [reservedOp "_" >> return wildcard,
+                   var,
+                   aterm,
+                   atuple,
+                   S.int    <$> integer,
+                   S.float  <$> float,
+                   S.string <$> stringLiteral,
+                   try list1,
+                   list2
+                   ] <?> "term"
 
-varOrWildcard :: GenParser Char st (Free (TermF id) Var)
-varOrWildcard = lexeme$ do
-  first <- (upper <|> char '_')
-  rest  <- many (alphaNum <|> char '_')
-  return $ case (first,rest) of
-             ('_', []) -> wildcard
-             _         -> (S.var (first : rest))
+aterm  = S.term <$> atom <*> (parens (commaSep1 term) <|> return [])
+atuple = S.tuple <$> parens(commaSep1 term)
 
 var :: (Functor t) =>GenParser Char st (Free t Var)
 var = lexeme$ do
@@ -87,12 +114,6 @@ var = lexeme$ do
   rest  <- many (alphaNum <|> char '_')
   return $ (S.var (first : rest))
 
-ident      = (identifier  <|>
-             identLiteral <|>
-             operator    <|>
-             string "{}" <|>
-             string ";"
-            ) <?> "ident"
 
 list1 = brackets $ do
   terms <- commaSep1 term
@@ -104,23 +125,28 @@ list2 = brackets $ do
   terms <- commaSep term
   return $ foldr cons nil terms
 
--- Expressions
--- ------------
-term    = buildExpressionParser table factor
-        <?> "expression"
+
+term_compound = buildExpressionParser table factor
+            <?> "expression"
 
 table   = [[op "*" AssocLeft, op "/" AssocLeft]
           ,[op "+" AssocLeft, op "-" AssocLeft]
+          ,[otherop]
           ]
         where
+          mkTerm s x y = S.term s [x,y]
+          otherop = Infix (do { p <- operator
+                              ; return (mkTerm p)})
+                          AssocLeft
           op s assoc
-             = Infix (do{ symbol s; return (\x y -> S.term s [x,y])}) assoc
+             = Infix (do{ reservedOp s; return (mkTerm s)}) assoc
 
-factor  = (try(parens term) <|> term_basic)
+factor  = (term_basic <|> parens term_compound)
         <?> "simple expression"
 
 -- Lexer
 -- ------
+quoted = lexeme . between (symbol "'") (symbol "'" <?> "end of quotes")
 
 whiteSpace= P.whiteSpace lexer
 lexeme    = P.lexeme lexer
@@ -153,22 +179,16 @@ prologStyle= emptyDef
                 , identStart     = oneOf ("+-*/\\^`~:.?@#=$&" ++ ['a'..'z'])
                 , identLetter	 = alphaNum <|> oneOf "+-*=/\\^`~:?@#$&_"
                 , opStart	 = opLetter prologStyle
-                , opLetter	 = oneOf "<>!=~|&"
+                , opLetter	 = oneOf "<>!/\\=~|&:+-*/@$!'"
                 , reservedOpNames= ["="]
                 , reservedNames  = []
                 , caseSensitive  = True
                 }
 
 prologDef = prologStyle
-            { reservedOpNames = [":-","|","!"]
-            , reservedNames  = ["is"]
+            { reservedOpNames = ["_",":-","|","!","\\+","->","-","+","/","*","=", ">", "<", ">=", "=<", "\\=", "=\\=","\\=="]
+            , reservedNames  = []
             }
-
-identLiteral = lexeme (between (char '\'')
-                               (char '\'' <?> "end of identifier")
-                               (many anythingButQuote)
-                     ) <?> "quoted identifier"
-  where anythingButQuote = try ( char '\'' >> char '\'' >> return '\'' ) <|> noneOf "'"
 
 -- Other
 -- -----
