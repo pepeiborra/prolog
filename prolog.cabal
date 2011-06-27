@@ -25,8 +25,8 @@ Library
      Language.Prolog.Semantics
 --     Text.ParserCombinators.Parsec.Applicative
 
-Executable hProlog
-  buildable: False
-  build-depends: haskeline, logict
-  main-is: Language/Prolog/REPL.hs
-  ghc-options: -main-is Language.Prolog.REPL.main
+-- Executable hProlog
+--  buildable: False
+--  build-depends: haskeline, logict
+--  main-is: Language/Prolog/REPL.hs
+--  ghc-options: -main-is Language.Prolog.REPL.main
