@@ -22,6 +22,8 @@ module Language.Prolog.Syntax (
 import Control.Applicative
 import Control.Monad.Free
 import Data.Bifunctor
+import Data.Bifoldable
+import Data.Bitraversable
 import Data.Char
 import Data.Foldable as F (Foldable(..), toList)
 import Data.Monoid
@@ -191,55 +193,35 @@ instance Functor     ClauseF where fmap     f (h :- c) = f h :- fmap f c
 instance Foldable    ClauseF where foldMap  f (h :- c) = f h `mappend` foldMap f c
 instance Traversable ClauseF where traverse f (h :- c) = (:-) <$> f h <*> traverse f c
 
-instance BifunctorM GoalF where
-    bimapM fid f (Pred a tt) = liftM2 Pred (fid a) (mapM f tt)
-    bimapM fid f Cut         = return Cut
-    bimapM fid f (Not t)     = liftM  Not (bimapM fid f t)
-    bimapM fid f (Is a b)    = liftM2 Is (f a) (f b)
-    bimapM fid f (a :=: b)   = liftM2 (:=:) (f a) (f b)
-    bimapM fid f (Ifte a b c)= liftM3 Ifte (f a) (bimapM fid f b) (bimapM fid f c)
-    bimapM fid f (Ift  a b)  = liftM2 Ift  (f a) (bimapM fid f b)
+instance Bifunctor GoalF where bimap = bimapDefault
+instance Bifoldable GoalF where bifoldMap = bifoldMapDefault
+instance Bitraversable GoalF where
+    bitraverse fid f (Pred a tt) = liftA2 Pred (fid a) (traverse f tt)
+    bitraverse fid f Cut         = pure Cut
+    bitraverse fid f (Not t)     = liftA  Not (bitraverse fid f t)
+    bitraverse fid f (Is a b)    = liftA2 Is (f a) (f b)
+    bitraverse fid f (a :=: b)   = liftA2 (:=:) (f a) (f b)
+    bitraverse fid f (Ifte a b c)= liftA3 Ifte (f a) (bitraverse fid f b) (bitraverse fid f c)
+    bitraverse fid f (Ift  a b)  = liftA2 Ift  (f a) (bitraverse fid f b)
 
-instance Foldable    (GoalF id) where
-    foldMap  f (Pred a tt) = foldMap f tt
-    foldMap  f Cut         = mempty
-    foldMap  f (Not t)     = foldMap f t
-    foldMap  f (Is a b)    = f a `mappend` f b
-    foldMap  f (a :=: b)   = f a `mappend` f b
-    foldMap  f (Ifte a b c)= f a `mappend` foldMap f b `mappend` foldMap f c
-    foldMap  f (Ift  a b)  = f a `mappend` foldMap f b
+deriving instance Functor  (GoalF id)
+deriving instance Foldable (GoalF id)
+deriving instance Traversable (GoalF id)
 
-instance Traversable (GoalF id) where
-    traverse f (Pred a tt) = Pred a <$> traverse f tt
-    traverse f Cut         = pure Cut
-    traverse f (Not t)     = Not <$> traverse f t
-    traverse f (Is a b)    = Is    <$> f a <*> f b
-    traverse f (a :=: b)   = (:=:) <$> f a <*> f b
-    traverse f (Ifte a b c)= Ifte <$> f a <*> traverse f b <*> traverse f c
-    traverse f (Ift  a b)  = Ift  <$> f a <*> traverse f b
+instance Bifunctor TermF where bimap = bimapDefault
+instance Bifoldable TermF where bifoldMap = bifoldMapDefault
+instance Bitraversable TermF where
+    bitraverse fid f (Term a tt) = liftA2 Term (fid a) (traverse f tt)
+    bitraverse _   f (Tuple  tt) = Tuple `liftA` traverse f tt
+    bitraverse _   f (Cons h t)  = liftA2 Cons (f h) (f t)
+    bitraverse _   _ Nil         = pure Nil
+    bitraverse _   _ (Int i)     = pure $ Int i
+    bitraverse _   _ (Float d)   = pure $ Float d
+    bitraverse _   _ Wildcard    = pure Wildcard
 
-instance BifunctorM TermF where
-    bimapM fid f (Term a tt) = liftM2 Term (fid a) (mapM f tt)
-    bimapM _   f (Tuple  tt) = Tuple `liftM` mapM f tt
-    bimapM _   f (Cons h t)  = liftM2 Cons (f h) (f t)
-    bimapM _   _ Nil         = return Nil
-    bimapM _   _ (Int i)     = return $ Int i
-    bimapM _   _ (Float d)   = return $ Float d
-    bimapM _   _ Wildcard    = return Wildcard
-instance Foldable (TermF id) where
-    foldMap  f (Term a tt) = foldMap f tt
-    foldMap  f (Tuple  tt) = foldMap f tt
-    foldMap  f (Cons h t)  = f h `mappend` f t
-    foldMap  f _           = mempty
-instance Traversable (TermF id) where
-    traverse f (Term a tt) = Term a <$> traverse f tt
-    traverse f (Tuple  tt) = Tuple  <$> traverse f tt
-    traverse f (Cons h t)  = Cons <$> f h <*> f t
-    traverse _ Nil         = pure Nil
-    traverse f (Int i)     = pure (Int i)
-    traverse f (Float i)   = pure (Float i)
-    traverse f Wildcard    = pure Wildcard
-
+deriving instance Functor (TermF id)
+deriving instance Foldable (TermF id)
+deriving instance Traversable (TermF id)
 -- Term Boilerplate
 -- ----------------
 instance (Eq id, GetMatcher t v a) => GetMatcher t v (GoalF id a) where getMatcherM = getMatcherMdefault
