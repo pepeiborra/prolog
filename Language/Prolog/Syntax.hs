@@ -5,6 +5,7 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module Language.Prolog.Syntax (
      ClauseF(..), cHead, cBody, GoalF(..), TermF(..),
@@ -29,7 +30,8 @@ import Data.Foldable as F (Foldable(..), toList)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Term hiding (Term)
+import Data.Term hiding (Term, TermF, Var)
+import qualified Data.Term as Family
 import Data.Term.Rules
 import Data.Term.Var
 import Data.Traversable (Traversable, traverse)
@@ -186,6 +188,17 @@ instance Pretty a => Pretty (ClauseF a)  where
     pPrint (h :- t)  = pPrint h <+> text ":-" <+> hcat(punctuate comma (map pPrint t)) <> char '.'
     pPrintList l     = vcat . map pPrint
 
+-- Term Families
+-- -------------
+type instance Family.Var   (ClauseF a) = Family.Var a
+type instance Family.TermF (ClauseF a) = Family.TermF a
+
+type instance Family.Var   (GoalF id a) = Family.Var a
+type instance Family.TermF (GoalF id a) = Family.TermF a
+
+type instance Family.Id1 (TermF id)   = id
+type instance Family.Id  (ClauseF a)  = Family.Id a
+type instance Family.Id  (GoalF id a) = id
 
 -- Functor boilerplate
 -- --------------------
@@ -222,31 +235,31 @@ instance Bitraversable TermF where
 deriving instance Functor (TermF id)
 deriving instance Foldable (TermF id)
 deriving instance Traversable (TermF id)
+
 -- Term Boilerplate
 -- ----------------
-instance (Eq id, GetMatcher t v a) => GetMatcher t v (GoalF id a) where getMatcherM = getMatcherMdefault
-instance (Eq id, GetUnifier t v a) => GetUnifier t v (GoalF id a) where getUnifierM = getUnifierMdefault
-instance         GetFresh t v a    => GetFresh   t v (GoalF id a) where getFreshM   = getFreshMdefault
+instance GetVars f => GetVars (GoalF id f) where getVars = foldMap getVars
 
-instance GetMatcher t v a => GetMatcher t v (ClauseF a) where getMatcherM = getMatcherMdefault
-instance GetUnifier t v a => GetUnifier t v (ClauseF a) where getUnifierM = getUnifierMdefault
-instance GetFresh t v a   => GetFresh   t v (ClauseF a) where getFreshM   = getFreshMdefault
+instance (Eq id, GetMatcher a) => GetMatcher (GoalF id a) where getMatcherM = getMatcherMdefault
+instance (Eq id, GetUnifier a) => GetUnifier (GoalF id a) where getUnifierM = getUnifierMdefault
+instance         GetFresh a    => GetFresh   (GoalF id a) where getFreshM   = getFreshMdefault
+
+instance GetMatcher  a  => GetMatcher (ClauseF a) where getMatcherM = getMatcherMdefault
+instance (GetUnifier a) => GetUnifier (ClauseF a) where getUnifierM = getUnifierMdefault
+instance GetFresh    a  => GetFresh   (ClauseF a) where getFreshM   = getFreshMdefault
 
 instance Ord id => HasId (TermF id) where
-    type TermId (TermF id) = id
     getId (Term id _) = Just id
     getId _           = Nothing
 
-instance (HasId termF, TermId termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
-  type SignatureId (Program'' id (Free termF v)) = id
+instance (HasId termF, Family.Id1 termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
   getSignature cc = Sig {constructorSymbols = aritiesF, definedSymbols = aritiesP}
    where
     aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
     aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId t]]
 
-instance (HasId termF, TermId termF ~ id, Ord id, Foldable termF) =>
+instance (HasId termF, Family.Id1 termF ~ id, Ord id, Foldable termF) =>
     HasSignature (ClauseF (GoalF id (Free termF v))) where
-  type SignatureId (ClauseF (GoalF id (Free termF v))) = id
   getSignature c = getSignature [c]
 
 -- Other
