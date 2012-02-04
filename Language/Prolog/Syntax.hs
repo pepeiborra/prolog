@@ -27,7 +27,7 @@ import Data.Bifoldable
 import Data.Bitraversable
 import Data.Char
 import Data.Foldable as F (Foldable(..), toList)
-import Data.Monoid
+import Data.Monoid (Monoid(..))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Term hiding (Term, TermF, Var)
