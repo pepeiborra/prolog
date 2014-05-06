@@ -196,7 +196,7 @@ type instance Family.TermF (ClauseF a) = Family.TermF a
 type instance Family.Var   (GoalF id a) = Family.Var a
 type instance Family.TermF (GoalF id a) = Family.TermF a
 
-type instance Family.Id1 (TermF id)   = id
+type instance Family.Id  (TermF id)   = id
 type instance Family.Id  (ClauseF a)  = Family.Id a
 type instance Family.Id  (GoalF id a) = id
 
@@ -252,13 +252,13 @@ instance Ord id => HasId (TermF id) where
     getId (Term id _) = Just id
     getId _           = Nothing
 
-instance (HasId termF, Family.Id1 termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
+instance (HasId termF, Family.Id termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
   getSignature cc = Sig {constructorSymbols = aritiesF, definedSymbols = aritiesP}
    where
     aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
     aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId t]]
 
-instance (HasId termF, Family.Id1 termF ~ id, Ord id, Foldable termF) =>
+instance (HasId termF, Family.Id termF ~ id, Ord id, Foldable termF) =>
     HasSignature (ClauseF (GoalF id (Free termF v))) where
   getSignature c = getSignature [c]
 

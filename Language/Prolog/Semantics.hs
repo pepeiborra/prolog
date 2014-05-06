@@ -15,36 +15,19 @@ module Language.Prolog.Semantics (
         GetFresh(..), GetUnifier(..))
    where
 
-import Control.Applicative
-import Control.Arrow (first, second)
-import Control.Exception as CE
-import Control.Monad (liftM, zipWithM, zipWithM_, msum, MonadPlus(..), join, ap, (>=>))
 import Control.Monad.Free hiding (mapM)
-import Control.Monad.Free.Zip
-import Control.Monad.Identity (Identity)
-import Control.Monad.List (ListT(..))
-import Control.Monad.Logic (Logic, LogicT, MonadLogic(..), observeAll, observeAllT)
-import Control.Monad.RWS (RWS, RWST)
-import Control.Monad.State  (State, StateT(..), MonadState(..), execStateT, evalState, evalStateT, modify, MonadTrans(..))
-import Control.Monad.Variant (variantsWith, runVariantT')
+import Control.Monad.Logic (LogicT, MonadLogic(..), observeAll)
+import Control.Monad.Variant (runVariantT')
 import Control.Monad.Writer (WriterT(..), MonadWriter(..), execWriterT)
-import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Foldable (foldMap, toList, Foldable)
-import Data.Maybe(isJust)
-import Data.Monoid
 import Data.Traversable as T
-import Data.Map (Map)
 import Data.Term.Rules
 import Data.Term.Var
-import Data.Term.IOVar
 import Data.Term hiding (unify, Var)
-import qualified Data.Term as Term
+import qualified Data.Term as Family
 import Text.PrettyPrint.HughesPJClass
 
 import Prelude hiding (mapM)
-
-import Debug.Trace
 
 import Language.Prolog.Syntax
 
@@ -63,8 +46,8 @@ run :: forall var var0 termF idp term term0 m.
         Traversable termF,
         term0 ~ Free termF var0,
         term  ~ Free termF var,
-        var ~ VarM m,
-        termF ~ TermFM m,
+        var ~ Family.Var m,
+        termF ~ Family.TermF m,
         MonadLogic m, MonadEnv m, MonadVariant m, MonadWriter [Trace idp term] m) =>
        Program'' idp term0 -> GoalF idp term -> m Bool
 run pgm query = go [query] where
@@ -93,16 +76,13 @@ instance (Pretty (GoalF idp term)) => Pretty (Trace idp term) where
 -- -------------------
 -- Liftings for LogicT
 -- -------------------
-type instance VarM (LogicT m) = VarM m
-type instance TermFM (LogicT m) = TermFM m
+type instance Family.Var (LogicT m) = Family.Var m
+type instance Family.TermF (LogicT m) = Family.TermF m
 
 
 -- -----------
 -- Combinators
 -- -----------
-mapM3 = mapM.mapM.mapM
-mapM2 = mapM.mapM
-snub  = Set.toList . Set.fromList
 
 liftList :: MonadPlus m => [a] -> m a
 liftList = msum . map return

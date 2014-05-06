@@ -1,5 +1,5 @@
-name: prolog
-version: 0.2.20120204
+name: narradar-prolog
+version: 0.3
 build-type: Simple
 Cabal-Version:  >= 1.6
 license: PublicDomain
@@ -14,7 +14,15 @@ Flag transformers
 
 Library
   buildable: True
-  build-depends: base, parsec > 3, prettyclass, logict, containers, term >= 0.2.20111111, bifunctors, control-monad-free >= 0.4 
+  build-depends: 
+    base, 
+    parsec > 3, 
+    prettyclass, 
+    logict, 
+    containers, 
+    narradar-term >= 0.3, 
+    bifunctors, 
+    control-monad-free >= 0.4 
   if flag(transformers)
      build-depends: transformers, monads-fd
   else
