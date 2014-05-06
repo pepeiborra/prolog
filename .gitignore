@@ -1,0 +1,12 @@
+*.pdf
+.cabal-sandbox/
+repo/
+dist/
+wordpress-theme/
+*.hi
+*.o
+*.p_o
+*.*_o
+*.*-boot
+*.*~
+*.DS_Store
