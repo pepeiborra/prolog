@@ -42,8 +42,8 @@ debug pgm q =  (observeAll . runVariantT' vq . evalMEnv . execWriterT . run pgm)
 
 run :: forall var var0 termF idp term term0 m.
        (Ord var, Ord var0, Rename var0,
-        Eq (termF ()), Eq idp,
-        Traversable termF,
+        Eq idp,
+        Unify termF,
         term0 ~ Free termF var0,
         term  ~ Free termF var,
         var ~ Family.Var m,

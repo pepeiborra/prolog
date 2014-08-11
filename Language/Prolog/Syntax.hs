@@ -2,8 +2,10 @@
 {-# LANGUAGE TypeSynonymInstances, UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns, PatternGuards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
@@ -21,6 +23,7 @@ module Language.Prolog.Syntax (
      ) where
 
 import Control.Applicative
+import Control.Applicative.Compose
 import Control.Monad.Free
 import Data.Bifunctor
 import Data.Bifoldable
@@ -72,6 +75,13 @@ type Program id = [Clause id]
 type Clause  id = ClauseF (Goal id)
 type Goal    id = GoalF id (Term id)
 type Term    id = Term' id Var
+
+instance Applicative ClauseF where
+  pure x = x :- [x]
+  f :- gg <*> x :- yy = f x :- zipWith ($) gg yy
+
+pattern CJ x = (Compose(Just x))
+pattern CN   = Compose Nothing
 
 cHead :: ClauseF a -> a
 cBody :: ClauseF a -> [a]
@@ -236,6 +246,36 @@ deriving instance Functor (TermF id)
 deriving instance Foldable (TermF id)
 deriving instance Traversable (TermF id)
 
+instance Eq id => Applicative (Maybe :+: TermF id) where
+  pure _ = CN
+  CJ(Term i ff) <*> CJ(Term id' xx)
+    | i == id' = CJ(Term i (zipWith ($) ff xx))
+  CJ(Cons f g) <*> CJ(Cons x y) = CJ(Cons (f x) (g y))
+  CJ Nil <*> CJ Nil = CJ Nil
+  CJ(Tuple ff) <*> CJ(Tuple xx) = CJ(Tuple $ zipWith ($) ff xx)
+  CJ(Int i) <*> CJ(Int j) | i == j = CJ(Int i)
+  CJ(Float i) <*> CJ(Float j) | i == j = CJ(Float i)
+  CJ(String s) <*> CJ(String s') | s == s' = CJ(String s)
+  CJ Wildcard <*> CJ Wildcard = CJ Wildcard
+  _ <*> _ = CN
+
+instance Eq id => Applicative (Maybe :+: GoalF id) where
+  pure _ = CN
+  CJ (Pred i ff) <*> CJ(Pred id' xx)
+    | i == id' = CJ $ Pred i (zipWith ($) ff xx)
+  CJ(f :=: g) <*> CJ(x :=: y) = CJ (f x :=: g y)
+  CJ(Is f g)  <*> CJ(Is x y) = CJ (Is (f x) (g y))
+  CJ(Ift f k) <*> CJ(Ift x k') = Compose $ do
+    kk' <- decompose(CJ k <*> CJ k')
+    return (Ift (f x) kk')
+  CJ(Ifte f k1 k2) <*> CJ(Ifte x k1' k2') = Compose $ do
+    kk1 <- decompose(CJ k1 <*> CJ k1')
+    kk2 <- decompose(CJ k2 <*> CJ k2')
+    return (Ifte (f x) kk1 kk2)
+  CJ(Not k) <*> CJ(Not k') = Compose(Not <$> decompose(CJ k <*> CJ k'))
+  CJ Cut <*> CJ Cut = CJ Cut
+  _ <*> _ = CN
+
 -- Term Boilerplate
 -- ----------------
 instance GetVars f => GetVars (GoalF id f) where getVars = foldMap getVars
@@ -248,17 +288,17 @@ instance GetMatcher  a  => GetMatcher (ClauseF a) where getMatcherM = getMatcher
 instance (GetUnifier a) => GetUnifier (ClauseF a) where getUnifierM = getUnifierMdefault
 instance GetFresh    a  => GetFresh   (ClauseF a) where getFreshM   = getFreshMdefault
 
-instance Ord id => HasId (TermF id) where
-    getId (Term id _) = Just id
-    getId _           = Nothing
+instance Ord id => HasId1 (TermF id) where
+    getId1 (Term id _) = Just id
+    getId1 _           = Nothing
 
-instance (HasId termF, Family.Id termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
+instance (HasId1 termF, Family.Id termF ~ id, Ord id, Foldable termF) => HasSignature (Program'' id (Free termF v)) where
   getSignature cc = Sig {constructorSymbols = aritiesF, definedSymbols = aritiesP}
    where
     aritiesP = Map.fromList [ (f, length tt) | Pred f tt   <- F.toList =<< cc]
-    aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId t]]
+    aritiesF = Map.fromList [ (f, length $ toList t) | Pred _ args <- F.toList =<< cc, Impure t <- subterms =<< args, Just f <- [getId1 t]]
 
-instance (HasId termF, Family.Id termF ~ id, Ord id, Foldable termF) =>
+instance (HasId1 termF, Family.Id termF ~ id, Ord id, Foldable termF) =>
     HasSignature (ClauseF (GoalF id (Free termF v))) where
   getSignature c = getSignature [c]
 

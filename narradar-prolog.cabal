@@ -22,7 +22,8 @@ Library
     containers, 
     narradar-term >= 0.3, 
     bifunctors, 
-    control-monad-free >= 0.4 
+    control-monad-free >= 0.4,
+    applicative-extras
   if flag(transformers)
      build-depends: transformers, monads-fd
   else
