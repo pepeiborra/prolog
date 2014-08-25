@@ -38,6 +38,7 @@ import qualified Data.Term as Family
 import Data.Term.Rules
 import Data.Term.Var
 import Data.Traversable (Traversable, traverse)
+import Prelude.Extras
 
 import Text.PrettyPrint.HughesPJClass hiding (int, float)
 import qualified Text.PrettyPrint.HughesPJClass as Ppr
@@ -50,7 +51,8 @@ data GoalF id f= Pred {pred::id,args::[f]}
                | Ifte f (GoalF id f) (GoalF id f)
                | Not (GoalF id f)
                | Cut
-   deriving (Eq, Ord, Show)
+                 deriving (Eq, Ord, Show)
+
 data TermF id f= Term {functor::id, fargs::[f]}
                | Cons f f
                | Nil
@@ -58,7 +60,18 @@ data TermF id f= Term {functor::id, fargs::[f]}
                | Int Integer
                | Float Double
                | String String
-               | Wildcard deriving (Eq, Ord, Show)
+               | Wildcard
+                 deriving (Eq, Ord, Show)
+
+instance Eq1 ClauseF where f :- ff ==# g :- gg = f == g && ff == gg
+
+instance Eq id => Eq1(GoalF id)
+instance Eq id => Eq1(TermF id)
+instance Ord id => Ord1(GoalF id)
+instance Ord id => Ord1(TermF id)
+instance Show id => Show1(GoalF id)
+instance Show id => Show1(TermF id)
+
 
 type ProgramI idp idt = [ClauseI idp idt]
 type ClauseI  idp idt =  ClauseF (GoalF idp (Term' idt Var))

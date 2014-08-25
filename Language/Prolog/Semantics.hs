@@ -1,4 +1,3 @@
-
 {-# LANGUAGE NoMonomorphismRestriction, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -26,12 +25,14 @@ import Data.Term.Var
 import Data.Term hiding (unify, Var)
 import qualified Data.Term as Family
 import Text.PrettyPrint.HughesPJClass
+import Debug.Hoed.Observe
 
 import Prelude hiding (mapM)
 
 import Language.Prolog.Syntax
 
-eval  :: (Eq idp, term ~ Free termF var, Enum var, Ord var, Rename var, Traversable termF, Unify termF) => Program'' idp term -> GoalF idp term -> [Substitution termF var]
+eval  :: ( Eq idp, term ~ Free termF var, Enum var, Ord var, Rename var, Observable var
+         , Traversable termF, Unify termF) => Program'' idp term -> GoalF idp term -> [Substitution termF var]
 eval pgm q = (fmap (restrictTo vq .  zonkSubst . snd) . filter (fst.fst) . observeAll . runVariantT' vq . runMEnv . runWriterT . run pgm) q
     where vq = Set.toList(getVars q)
 
@@ -41,7 +42,7 @@ debug pgm q =  (observeAll . runVariantT' vq . evalMEnv . execWriterT . run pgm)
      vq = Set.toList $ getVars q
 
 run :: forall var var0 termF idp term term0 m.
-       (Ord var, Ord var0, Rename var0,
+       (Ord var, Ord var0, Rename var0, Observable var0, Observable var,
         Eq idp,
         Unify termF,
         term0 ~ Free termF var0,
