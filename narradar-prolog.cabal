@@ -17,7 +17,7 @@ Library
   build-depends: 
     base, 
     parsec > 3, 
-    prettyclass, 
+    pretty, 
     logict, 
     containers, 
     narradar-term >= 0.3, 
